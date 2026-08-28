@@ -1,0 +1,64 @@
+Nova Modding Suite
+Copyright (c) 2026 Ultra-XT (https://github.com/Ultra-XT/HOI4-Modding-Suite)
+
+Licensed under the Creative Commons
+Attribution-NonCommercial-NoDerivatives 4.0 International License
+(CC BY-NC-ND 4.0).
+
+Full legal text: https://creativecommons.org/licenses/by-nc-nd/4.0/legalcode
+Plain summary:   https://creativecommons.org/licenses/by-nc-nd/4.0/
+
+========================================================================
+WHAT THIS MEANS, IN PLAIN WORDS
+========================================================================
+
+YOU MAY:
+
+  * Use Nova to build your mods, including mods you release publicly.
+    Anything YOU create with Nova is YOURS. This licence covers Nova
+    itself, not the mods you make with it.
+
+  * Share Nova with anyone, for free. Hand it to a friend, mirror the
+    installer, link it on a Discord — as long as it is the unmodified
+    build and you say where it came from.
+
+YOU MAY NOT:
+
+  * Sell it, put it behind a paywall or a donation wall, bundle it into
+    anything paid, or run ads against it. (NonCommercial)
+
+  * Publish a modified version, a fork, a rebrand, or a derivative
+    tool built from this code. (NoDerivatives)
+
+  * Republish it stripped of attribution, or in a way that suggests the
+    author endorses your version.
+
+  * Distribute a build you have altered — including one with anything
+    added to the installer. If you obtained Nova from anywhere other
+    than the official releases page, verify it before running it.
+
+========================================================================
+NOT COVERED BY THIS LICENCE
+========================================================================
+
+Hearts of Iron IV, its game files, artwork and trademarks are
+(c) Paradox Interactive and are NOT redistributed by this project.
+Nova reads the copy of the game already installed on your machine.
+
+Nova is not affiliated with or endorsed by Paradox Interactive.
+
+========================================================================
+NO WARRANTY
+========================================================================
+
+Nova is provided "as is", without warranty of any kind, express or
+implied. It edits files in your mod folder. It takes backups before it
+writes, but you should keep your own backups of anything you care
+about. To the fullest extent permitted by law, the author is not liable
+for any claim, damages or other liability arising from the use of this
+software.
+
+========================================================================
+
+If you want to do something this licence does not allow, open an issue
+and ask. The answer may well be yes.
