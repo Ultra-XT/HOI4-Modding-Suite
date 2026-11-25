@@ -1,0 +1,692 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Country Setup — Nova Modding Suite</title>
+    <link rel="stylesheet" href="./styles.css?v=minimap23b" />
+    <!-- Loads early so it wraps fetch before the page's own scripts run; shows a loading
+         overlay only if the first-visit cache build actually takes a moment. -->
+    <script src="./nova-i18n.js?v=1"></script>
+    <script src="./nova-bug-report.js?v=2"></script>
+    <script src="./loading-overlay.js?v=oobnote6"></script>
+    <script src="./nova-combo.js?v=5"></script>
+    <style>
+      .cs-layout {
+        display: flex;
+        height: calc(100vh - 65px);
+        overflow: hidden;
+      }
+
+      /* --- Sidebar --- */
+      .cs-sidebar {
+        width: 280px;
+        background: #11161e;
+        border-right: 1px solid #2d3440;
+        display: flex;
+        flex-direction: column;
+      }
+      .cs-sidebar-header {
+        padding: 12px;
+        background: #1c232d;
+        border-bottom: 1px solid #2d3440;
+      }
+      .cs-sidebar-header label {
+        display: block;
+        font-size: 11px;
+        color: #8b949e;
+        font-weight: 600;
+        margin-bottom: 6px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+      .cs-sidebar-header select {
+        width: 100%;
+        padding: 6px 8px;
+        background: #0d1117;
+        border: 1px solid #30363d;
+        color: #c9d1d9;
+        border-radius: 4px;
+        font-size: 13px;
+        cursor: pointer;
+      }
+      .cs-country-list {
+        flex: 1;
+        overflow-y: auto;
+        padding: 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .cs-country-item {
+        padding: 8px 12px;
+        background: #1a202a;
+        border: 1px solid #2d3440;
+        border-radius: 6px;
+        cursor: pointer;
+        color: #c9d1d9;
+        font-size: 13px;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.15s ease;
+      }
+      .cs-country-item:hover {
+        background: #232c3a;
+        border-color: #58a6ff;
+      }
+      .cs-country-item.active {
+        background: #1a3a5c;
+        border-color: #58a6ff;
+        color: #fff;
+      }
+      .cs-country-item .cs-tag {
+        font-weight: 700;
+        font-family: monospace;
+        font-size: 14px;
+        color: #58a6ff;
+        min-width: 32px;
+      }
+      .cs-country-item .cs-name {
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .cs-country-item .cs-spirit-count {
+        background: #30363d;
+        color: #8b949e;
+        padding: 2px 6px;
+        border-radius: 10px;
+        font-size: 11px;
+        font-weight: 600;
+      }
+
+      /* --- Main panel --- */
+      .cs-main {
+        flex: 1;
+        padding: 24px;
+        overflow-y: auto;
+        background: #0d1117;
+      }
+      .cs-panel {
+        background: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 8px;
+        padding: 24px;
+        max-width: 900px;
+        margin: 0 auto;
+      }
+      .cs-panel-title {
+        font-size: 20px;
+        font-weight: 700;
+        color: #e6edf3;
+        margin: 0 0 4px 0;
+      }
+      .cs-panel-sub {
+        font-size: 13px;
+        color: #8b949e;
+        margin: 0 0 20px 0;
+      }
+
+      /* Spirit list inside panel */
+      .cs-spirits-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid #21262d;
+      }
+      .cs-spirits-header h3 {
+        margin: 0;
+        font-size: 15px;
+        color: #c9d1d9;
+      }
+      .cs-spirit-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 14px;
+        background: #0d1117;
+        border: 1px solid #21262d;
+        border-radius: 6px;
+        margin-bottom: 6px;
+        transition: border-color 0.15s;
+      }
+      .cs-spirit-row:hover {
+        border-color: #30363d;
+      }
+      .cs-spirit-icon {
+        width: 36px;
+        height: 36px;
+        background: #161b22;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        color: #8b949e;
+        flex-shrink: 0;
+        overflow: hidden;
+      }
+      .cs-spirit-icon img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+      }
+      /* The class now lands on the <img> itself when a spirit HAS art, and on the shield <div> when it does
+         not, so the sizing has to hold either way. object-fit only matters in the img case. */
+      img.cs-spirit-icon,
+      img.cs-picker-icon {
+        object-fit: contain;
+      }
+      .cs-picker-icon {
+        width: 36px;
+        height: 36px;
+        flex-shrink: 0;
+        background: #0d1117;
+        border-radius: 4px;
+      }
+      .cs-spirit-info {
+        flex: 1;
+        min-width: 0;
+      }
+      .cs-spirit-id {
+        font-family: monospace;
+        font-size: 13px;
+        color: #e6edf3;
+        font-weight: 600;
+      }
+      .cs-spirit-name {
+        font-size: 12px;
+        color: #8b949e;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .cs-spirit-remove {
+        padding: 4px 10px;
+        background: transparent;
+        border: 1px solid #f8514930;
+        border-radius: 4px;
+        color: #f85149;
+        font-size: 12px;
+        cursor: pointer;
+        font-weight: 600;
+        transition: all 0.15s;
+      }
+      .cs-spirit-remove:hover {
+        background: #f8514920;
+        border-color: #f85149;
+      }
+
+      /* Add spirit section */
+      .cs-add-section {
+        margin-top: 16px;
+        padding: 14px;
+        background: #0d1117;
+        border: 1px dashed #30363d;
+        border-radius: 6px;
+      }
+      .cs-add-section label {
+        display: block;
+        font-size: 12px;
+        color: #8b949e;
+        font-weight: 600;
+        margin-bottom: 6px;
+      }
+      .cs-add-row {
+        display: flex;
+        gap: 8px;
+      }
+      .cs-add-row input {
+        flex: 1;
+        padding: 6px 10px;
+        background: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 4px;
+        color: #c9d1d9;
+        font-size: 13px;
+      }
+      .cs-add-row input:focus {
+        outline: none;
+        border-color: #58a6ff;
+      }
+      .cs-add-suggestions {
+        margin-top: 8px;
+        max-height: 150px;
+        overflow-y: auto;
+        display: none;
+      }
+      .cs-add-suggestion {
+        padding: 6px 10px;
+        cursor: pointer;
+        color: #c9d1d9;
+        font-size: 12px;
+        font-family: monospace;
+        border-radius: 4px;
+      }
+      .cs-add-suggestion:hover {
+        background: #1a3a5c;
+      }
+
+      /* Empty state */
+      .cs-empty {
+        text-align: center;
+        padding: 40px;
+        color: #8b949e;
+      }
+      .cs-empty-icon {
+        font-size: 48px;
+        margin-bottom: 12px;
+      }
+
+      /* Buttons */
+      .btn {
+        padding: 8px 16px;
+        background: #238636;
+        color: #fff;
+        border: 1px solid rgba(240, 246, 252, 0.1);
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 13px;
+      }
+      .btn:hover { background: #2ea043; }
+      .btn-secondary {
+        background: #21262d;
+      }
+      .btn-secondary:hover { background: #30363d; }
+      .btn-sm {
+        padding: 4px 12px;
+        font-size: 12px;
+      }
+
+      /* File path bar */
+      .cs-file-bar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        background: #0d1117;
+        border: 1px solid #21262d;
+        border-radius: 4px;
+        margin-bottom: 16px;
+        font-size: 12px;
+        color: #8b949e;
+        font-family: monospace;
+      }
+      .cs-file-bar .cs-file-label {
+        color: #58a6ff;
+        font-weight: 600;
+        font-family: inherit;
+      }
+      .cs-file-bar .cs-file-status {
+        margin-left: auto;
+        padding: 2px 8px;
+        border-radius: 10px;
+        font-size: 11px;
+        font-weight: 600;
+      }
+      .cs-file-bar .cs-in-mod {
+        background: #23863640;
+        color: #3fb950;
+      }
+      .cs-file-bar .cs-in-vanilla {
+        background: #d2992240;
+        color: #d29922;
+      }
+      
+      /* AI GENERATOR */
+      .ai-generator-panel {
+        background: linear-gradient(145deg, #1c1328, #110d1a);
+        border: 1px solid #482f6e;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 24px;
+      }
+      .ai-generator-panel h3 {
+        margin: 0 0 12px 0;
+        color: #d1b4ff;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+    </style>
+    <link rel="icon" href="favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" href="favicon.png">
+</head>
+  <body>
+    <div id="topDock" class="top-dock">
+      <nav class="suite-nav">
+        <a href="home.html" class="suite-nav-link" data-i18n="nav.home">Home</a>
+        <a href="country-setup.html" class="suite-nav-link active" data-i18n="nav.countrySetup">Country Setup</a>
+        <a href="characters.html" class="suite-nav-link" data-i18n="nav.characters">Characters</a>
+        <a href="ideas.html" class="suite-nav-link" data-i18n="nav.nationalSpirits">National Spirits</a>
+        <a href="research.html" class="suite-nav-link" data-i18n="nav.researchTree">Research Tree</a>
+        <a href="index.html" class="suite-nav-link" data-i18n="nav.focusTree">Focus Tree</a>
+        <a href="events.html" class="suite-nav-link" data-i18n="nav.events">Events</a>
+        <a href="decisions.html" class="suite-nav-link" data-i18n="nav.decisions">Decisions</a>
+        <a href="map.html" class="suite-nav-link" data-i18n="nav.mapEditor">Map Editor</a>
+        <a href="army.html" class="suite-nav-link" data-i18n="nav.military">Military</a>
+        <a href="modhealth.html" class="suite-nav-link" data-i18n="nav.modHealth">Mod Health</a>
+
+        <!-- target="_blank" is load-bearing, not decoration. main.js blocks in-window navigation to any
+             non-app origin (will-navigate -> preventDefault + "network blocked" warning), but routes a
+             window-open to an https URL through shell.openExternal. So this opens the user's real browser;
+             a plain href would look like an error. -->
+        <a href="https://discord.gg/Z6P23hjEsM" target="_blank" rel="noopener noreferrer"
+           class="suite-nav-link suite-nav-discord" style="margin-left:auto;"
+           title="Join the Nova Discord — report bugs and ask questions"><svg class="suite-nav-discord-mark" viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true" focusable="false"><path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z"/></svg>Discord</a>
+      </nav>
+      <header class="app-header">
+        <div class="title-row">
+          <h1>HOI4 Country Setup</h1>
+          <div class="header-actions">
+            <div class="mod-selector-container" style="display: flex; align-items: center; gap: 8px; margin-right: 16px; background: #21262d; padding: 6px 12px; border-radius: 6px; border: 1px solid #30363d;">
+              <span style="font-size: 12px; color: #8b949e; font-weight: 600; white-space: nowrap;">📁 Active Mod:</span>
+              <select id="headerModSelector" style="background: #0d1117; border: 1px solid #30363d; color: #c9d1d9; border-radius: 4px; padding: 4px 8px; font-size: 12px; outline: none; cursor: pointer; min-width: 150px; max-width: 300px;"></select>
+            </div>
+          </div>
+        </div>
+      </header>
+    </div>
+
+    <div id="vanillaBanner" style="display: none; background: linear-gradient(90deg, #2a1800, #1a1000); border-bottom: 2px solid #d29922; padding: 10px 20px; text-align: center; font-size: 13px; color: #d29922; font-weight: 600;">
+      ⚠️ You are viewing <strong>Vanilla Game Files</strong> (read-only). To save changes, select or <a href="index.html" style="color: #58a6ff; text-decoration: underline;">create a mod</a> first.
+    </div>
+
+    <div class="cs-layout">
+      <!-- Sidebar: country list -->
+      <div class="cs-sidebar">
+        <div class="cs-sidebar-header">
+          <label>Country Filter</label>
+          <input type="text" id="csCountrySearch" placeholder="🔍 Search by tag or name..." style="width: 100%; padding: 6px 8px; background: #0d1117; border: 1px solid #30363d; color: #c9d1d9; border-radius: 4px; font-size: 12px; margin-bottom: 8px;" />
+          <button class="btn btn-sm" id="csCreateCountryBtn" style="width: 100%; background: #1a3a5c; border-color: #30363d; display: flex; align-items: center; justify-content: center; gap: 4px; padding: 6px;">➕ Create Country</button>
+          <button class="btn btn-sm" id="csCustomizeBaseBtn" title="Open an existing base-game (or base-mod) country by its tag — e.g. GER, LUX — to customize its starting setup. Saving writes an override into your mod; the base game is never touched." style="width: 100%; background: #21262d; border-color: #30363d; display: flex; align-items: center; justify-content: center; gap: 4px; padding: 6px; margin-top: 6px;">🌍 Customize base-game country…</button>
+        </div>
+        <div class="cs-country-list" id="csCountryList">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+
+      <!-- Main panel -->
+      <div class="cs-main">
+        <div id="csEmptyState" class="cs-empty">
+          <div class="cs-empty-icon">🏳️</div>
+          <p style="font-size: 16px; font-weight: 600;">Select a Country</p>
+          <p style="font-size: 13px;">Choose a country from the sidebar to view and manage its starting national spirits.</p>
+        </div>
+
+        <div id="csPanel" class="cs-panel" style="display: none;">
+          <h2 class="cs-panel-title" id="csPanelTitle">Germany (GER)</h2>
+          <p class="cs-panel-sub" id="csPanelSub">Manage national spirits this country starts the game with.</p>
+
+          <div class="cs-file-bar" id="csFileBar">
+            <span class="cs-file-label">📄 History File:</span>
+            <span id="csFilePath">—</span>
+            <span id="csFileStatus" class="cs-file-status"></span>
+          </div>
+
+          <!-- 🗺 Minimap + Map link. Geography (territory / capital / colour) is edited on the Map; this is a
+               live preview of where the selected country sits, and a one-click jump to edit it there. -->
+          <div id="csMapCard" style="background:#161b22; border:1px solid #30363d; border-radius:6px; padding:14px; margin-bottom:20px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px;">
+              <h3 style="margin:0; font-size:15px; color:#c9d1d9;">🗺 Territory &amp; Map</h3>
+              <div style="display:flex; gap:8px;">
+                <button class="btn btn-sm btn-secondary" id="csArmyBtn" title="Open the Military tab with this country loaded — division templates, deployment, equipment.">🪖 Set up army ↗</button>
+                <button class="btn btn-sm" id="csEditOnMapBtn" title="Open the Map editor focused on this country to edit its territory, capital and colour.">Edit on Map ↗</button>
+              </div>
+            </div>
+            <p style="margin:0 0 10px; font-size:12px; color:#8b949e;">Geography — territory, capital and colour — is edited on the <strong>Map</strong>. Below is a live preview of where this country sits.</p>
+            <div id="csMiniMapWrap" style="position:relative; width:100%; height:240px; border:1px solid #21262d; border-radius:6px; overflow:hidden; background:#0d1117; display:flex; align-items:center; justify-content:center;">
+              <img id="csMiniMap" alt="Country location preview" style="max-width:100%; max-height:100%; display:none; image-rendering:auto;" />
+              <div id="csMiniMapHint" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#6e7681; font-size:12px; pointer-events:none; text-align:center; padding:0 12px;">Select a country to preview its location on the map.</div>
+            </div>
+          </div>
+
+          <!-- Country Flag -->
+          <div id="csFlagCard" style="background:#161b22; border:1px solid #30363d; border-radius:6px; padding:14px; margin-bottom:20px;">
+            <h3 style="margin:0 0 8px; font-size:15px; color:#c9d1d9;">🏴 Country Flag</h3>
+            <p style="margin:0 0 12px; font-size:12px; color:#8b949e;">Upload this country's flag — a normal <strong>PNG, JPG or BMP</strong> is fine. Nova writes the HOI4 <code>gfx/flags/&lt;TAG&gt;.tga</code> at all three sizes (82×52, 41×26, 10×7) plus the per-ideology variants. Without a flag, a new country shows a blank placeholder in-game.</p>
+            <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
+              <div style="width:82px; height:52px; border:1px solid #30363d; border-radius:3px; background:#0d1117; background-size:contain; background-position:center; background-repeat:no-repeat; display:flex; align-items:center; justify-content:center; overflow:hidden; flex:0 0 auto;">
+                <img id="csFlagPreview" alt="" style="max-width:100%; max-height:100%; display:none;" />
+                <span id="csFlagPreviewHint" style="font-size:10px; color:#6e7681; text-align:center; padding:2px;">no image</span>
+              </div>
+              <div style="display:flex; flex-direction:column; gap:8px;">
+                <input type="file" id="csFlagFileInput" accept="image/png,image/jpeg,image/bmp" style="display:none" />
+                <div style="display:flex; gap:8px;">
+                  <button class="btn btn-sm" id="csFlagChooseBtn" type="button" style="background:#21262d; border-color:#30363d;">🖼 Choose image…</button>
+                  <button class="btn btn-sm" id="csFlagUploadBtn" type="button" disabled style="background:#1a3a5c; border-color:#30363d;">⬆ Set as flag</button>
+                </div>
+                <span id="csFlagStatus" style="font-size:12px; color:#8b949e;"></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Starting Stats & Politics Section -->
+          <div style="background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 16px; margin-bottom: 20px;">
+            <h3 style="margin-top: 0; margin-bottom: 16px; font-size: 15px; color: #c9d1d9; border-bottom: 1px solid #21262d; padding-bottom: 8px;">⚙️ Country Details</h3>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+              <div>
+                <label style="display: block; font-size: 12px; color: #8b949e; margin-bottom: 6px; font-weight: 600;">🗺 Capital State <span style="color:#6e7681; font-weight:400;">(set on the Map)</span></label>
+                <input type="number" id="csCapital" placeholder="— set on the Map tab —" style="width: 100%; padding: 6px 10px; background: #0d1117; border: 1px solid #30363d; border-radius: 4px; color: #c9d1d9; font-size: 13px;" />
+              </div>
+              <div>
+                <label style="display: block; font-size: 12px; color: #8b949e; margin-bottom: 6px; font-weight: 600;">Research Slots</label>
+                <input type="number" id="csResearchSlots" placeholder="e.g. 3 (majors start with 4)" style="width: 100%; padding: 6px 10px; background: #0d1117; border: 1px solid #30363d; border-radius: 4px; color: #c9d1d9; font-size: 13px;" />
+              </div>
+              <div>
+                <label style="display: block; font-size: 12px; color: #8b949e; margin-bottom: 6px; font-weight: 600;">Stability (%)</label>
+                <input type="number" id="csStability" min="0" max="100" step="1" placeholder="e.g. 50" style="width: 100%; padding: 6px 10px; background: #0d1117; border: 1px solid #30363d; border-radius: 4px; color: #c9d1d9; font-size: 13px;" />
+              </div>
+              <div>
+                <label style="display: block; font-size: 12px; color: #8b949e; margin-bottom: 6px; font-weight: 600;">War Support (%)</label>
+                <input type="number" id="csWarSupport" min="0" max="100" step="1" placeholder="e.g. 30" style="width: 100%; padding: 6px 10px; background: #0d1117; border: 1px solid #30363d; border-radius: 4px; color: #c9d1d9; font-size: 13px;" />
+              </div>
+              <div>
+                <label style="display: block; font-size: 12px; color: #8b949e; margin-bottom: 6px; font-weight: 600;">Starting Convoys</label>
+                <input type="number" id="csConvoys" placeholder="e.g. 100 (0 if landlocked)" style="width: 100%; padding: 6px 10px; background: #0d1117; border: 1px solid #30363d; border-radius: 4px; color: #c9d1d9; font-size: 13px;" />
+              </div>
+            </div>
+
+            <h4 style="margin-top: 20px; margin-bottom: 12px; font-size: 13px; color: #c9d1d9; font-weight: 600;">⚖️ Politics & Government</h4>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+              <div>
+                <label style="display: block; font-size: 12px; color: #8b949e; margin-bottom: 6px; font-weight: 600;">Ruling Party</label>
+                <select id="csRulingParty" style="width: 100%; padding: 6px 10px; background: #0d1117; border: 1px solid #30363d; border-radius: 4px; color: #c9d1d9; font-size: 13px; cursor: pointer;">
+                  <option value="neutrality">Neutrality</option>
+                  <option value="democratic">Democratic</option>
+                  <option value="fascism">Fascism</option>
+                  <option value="communism">Communism</option>
+                </select>
+              </div>
+              <div>
+                <label style="display: block; font-size: 12px; color: #8b949e; margin-bottom: 6px; font-weight: 600;">Elections Allowed</label>
+                <select id="csElectionsAllowed" style="width: 100%; padding: 6px 10px; background: #0d1117; border: 1px solid #30363d; border-radius: 4px; color: #c9d1d9; font-size: 13px; cursor: pointer;">
+                  <option value="yes">Yes</option>
+                  <option value="no">No</option>
+                </select>
+              </div>
+              <div>
+                <label style="display: block; font-size: 12px; color: #8b949e; margin-bottom: 6px; font-weight: 600;">Last Election Date</label>
+                <input type="text" id="csLastElection" placeholder="e.g. 1933.3.5" style="width: 100%; padding: 6px 10px; background: #0d1117; border: 1px solid #30363d; border-radius: 4px; color: #c9d1d9; font-size: 13px;" />
+              </div>
+              <div>
+                <label style="display: block; font-size: 12px; color: #8b949e; margin-bottom: 6px; font-weight: 600;">Election Frequency (months)</label>
+                <input type="number" id="csElectionFrequency" placeholder="e.g. 48 (every 4 years)" style="width: 100%; padding: 6px 10px; background: #0d1117; border: 1px solid #30363d; border-radius: 4px; color: #c9d1d9; font-size: 13px;" />
+              </div>
+            </div>
+
+            <h4 style="margin-top: 20px; margin-bottom: 12px; font-size: 13px; color: #c9d1d9; font-weight: 600;">📊 Ideology Popularity (%)</h4>
+            <!-- Boxes are (re)built by country-setup.js from /api/ideologies so a mod's full ideology
+                 set is shown (e.g. Millennium Dawn's 5th "nationalist"). These four are the vanilla
+                 fallback rendered before the fetch resolves / if it fails. -->
+            <div id="popularityGrid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;">
+              <div>
+                <label style="display: block; font-size: 11px; color: #8b949e; margin-bottom: 4px; text-align: center;">Democratic</label>
+                <input type="number" id="popDemocratic" data-ideology="democratic" data-ideology-input="1" min="0" max="100" placeholder="e.g. 25" style="width: 100%; text-align: center; padding: 6px 10px; background: #0d1117; border: 1px solid #30363d; border-radius: 4px; color: #c9d1d9; font-size: 13px;" />
+              </div>
+              <div>
+                <label style="display: block; font-size: 11px; color: #8b949e; margin-bottom: 4px; text-align: center;">Fascism</label>
+                <input type="number" id="popFascism" data-ideology="fascism" data-ideology-input="1" min="0" max="100" placeholder="e.g. 25" style="width: 100%; text-align: center; padding: 6px 10px; background: #0d1117; border: 1px solid #30363d; border-radius: 4px; color: #c9d1d9; font-size: 13px;" />
+              </div>
+              <div>
+                <label style="display: block; font-size: 11px; color: #8b949e; margin-bottom: 4px; text-align: center;">Communism</label>
+                <input type="number" id="popCommunism" data-ideology="communism" data-ideology-input="1" min="0" max="100" placeholder="e.g. 25" style="width: 100%; text-align: center; padding: 6px 10px; background: #0d1117; border: 1px solid #30363d; border-radius: 4px; color: #c9d1d9; font-size: 13px;" />
+              </div>
+              <div>
+                <label style="display: block; font-size: 11px; color: #8b949e; margin-bottom: 4px; text-align: center;">Neutrality</label>
+                <input type="number" id="popNeutrality" data-ideology="neutrality" data-ideology-input="1" min="0" max="100" placeholder="e.g. 25" style="width: 100%; text-align: center; padding: 6px 10px; background: #0d1117; border: 1px solid #30363d; border-radius: 4px; color: #c9d1d9; font-size: 13px;" />
+              </div>
+            </div>
+            <div style="margin-top: 8px; display: flex; align-items: center; justify-content: flex-end; gap: 10px;">
+              <button type="button" id="popBalanceBtn" title="Scale the values so they add up to exactly 100%"
+                style="font-size: 11px; padding: 3px 9px; background: #21262d; border: 1px solid #30363d; border-radius: 4px; color: #c9d1d9; cursor: pointer;">Balance to 100%</button>
+              <span id="popTotalIndicator" style="font-size: 12px; color: #8b949e;">Ideologies should add up to 100%.</span>
+            </div>
+
+            <!-- #new-country-has-no-names — a country with no common/names pool cannot have its generated
+                 characters named. Hidden unless it applies, and it carries the fix rather than just the news. -->
+            <div id="csNameListNote" style="display: none; margin-top: 16px; padding: 10px 12px; background: #21262d; border: 1px solid #9e6a03; border-left-width: 3px; border-radius: 4px;">
+              <div style="display: flex; align-items: flex-start; gap: 10px; flex-wrap: wrap;">
+                <span id="csNameListText" style="flex: 1 1 320px; font-size: 12px; color: #d29922; line-height: 1.5;"></span>
+                <button class="btn" id="csSeedNameListBtn" style="flex: 0 0 auto;">Give it a name pool</button>
+              </div>
+            </div>
+
+            <div style="margin-top: 20px; display: flex; justify-content: flex-end; gap: 8px;">
+              <button class="btn" id="csSaveDetailsBtn">Save Details</button>
+            </div>
+          </div>
+
+          <div class="cs-spirits-header">
+            <h3>🛡️ Starting National Spirits</h3>
+            <span id="csSpiritCount" style="font-size: 12px; color: #8b949e;"></span>
+          </div>
+
+          <div id="csSpiritsList">
+            <!-- Populated by JS -->
+          </div>
+
+          <!-- Add spirit section -->
+          <div class="cs-add-section" style="margin-bottom: 20px;">
+            <label>Add National Spirit</label>
+            <div class="cs-add-row" style="display: flex; gap: 8px; align-items: center;">
+              <input type="text" id="csAddSpiritInput" placeholder="Type spirit ID (e.g. german_war_economy)" list="csSpiritSuggestions" style="flex: 1; margin: 0;" />
+              <datalist id="csSpiritSuggestions"></datalist>
+              <button class="btn btn-sm btn-secondary" id="csBrowseSpiritBtn" style="padding: 6px 12px; font-size: 12px; white-space: nowrap;">Browse</button>
+              <button class="btn btn-sm" id="csAddSpiritBtn" style="padding: 6px 12px; font-size: 12px; white-space: nowrap;">+ Add</button>
+            </div>
+          </div>
+
+          <!-- Starting Technologies Section -->
+          <div style="background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 16px; margin-top: 20px;">
+            <h3 style="margin-top: 0; margin-bottom: 16px; font-size: 15px; color: #c9d1d9; border-bottom: 1px solid #21262d; padding-bottom: 8px;">🔬 Starting Technologies</h3>
+            <div id="csTechsList" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; margin-bottom: 16px;">
+              <!-- Populated by JS -->
+            </div>
+            <!-- Add tech section -->
+            <div class="cs-add-section">
+              <label>Add Starting Technology</label>
+              <div class="cs-add-row" style="display: flex; gap: 8px; align-items: center;">
+                <input type="text" id="csAddTechInput" placeholder="Type tech ID (e.g. infantry_weapons)" list="csTechSuggestions" style="flex: 1; padding: 6px 10px; background: #161b22; border: 1px solid #30363d; border-radius: 4px; color: #c9d1d9; font-size: 13px; margin: 0;" />
+                <datalist id="csTechSuggestions"></datalist>
+                <button class="btn btn-sm btn-secondary" id="csBrowseTechBtn" style="padding: 6px 12px; font-size: 12px; white-space: nowrap;">Browse</button>
+                <button class="btn btn-sm" id="csAddTechBtn" style="padding: 6px 12px; font-size: 12px; white-space: nowrap;">+ Add</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Create Country Dialog -->
+    <dialog id="csCreateCountryDialog" class="effect-amount-dialog" style="background: #161b22; border: 1px solid #30363d; border-radius: 8px; color: #c9d1d9; padding: 20px; width: 400px; max-width: 90%; box-shadow: 0 8px 32px rgba(0,0,0,0.5); outline: none;">
+      <form id="csCreateCountryForm" method="dialog" style="display: flex; flex-direction: column; gap: 12px;">
+        <h3 style="margin: 0; font-size: 16px; font-weight: 600; color: #e6edf3;">Create New Country</h3>
+        <div style="background:#13261b; border:1px solid #2ea04355; border-radius:6px; padding:10px 12px;">
+          <div style="font-size:12px; color:#7ee2a8; margin-bottom:8px; line-height:1.5;">✨ <b>Recommended:</b> draw the country on the <b>Map</b> — claim its land and the capital, borders and colour are set as you paint (geography lives on the Map).</div>
+          <button type="button" id="ccDrawOnMap" class="btn btn-sm" style="width:100%; background:#238636; border-color:#2ea043;">✨ Draw it on the Map →</button>
+        </div>
+        <div style="text-align:center; font-size:11px; color:#6e7681;">— or quick-create with a single starting state below —</div>
+        <div>
+          <label style="display: block; font-size: 12px; color: #8b949e; margin-bottom: 4px; font-weight: 600;">Country Tag (3 Chars, alphanumeric)</label>
+          <input type="text" id="ccTag" placeholder="e.g. ABC" maxlength="3" style="width: 100%; padding: 6px 10px; background: #0d1117; border: 1px solid #30363d; border-radius: 4px; color: #c9d1d9; font-size: 13px;" required />
+        </div>
+        <div>
+          <label style="display: block; font-size: 12px; color: #8b949e; margin-bottom: 4px; font-weight: 600;">Country Name</label>
+          <input type="text" id="ccName" placeholder="e.g. Atlantis" style="width: 100%; padding: 6px 10px; background: #0d1117; border: 1px solid #30363d; border-radius: 4px; color: #c9d1d9; font-size: 13px;" required />
+        </div>
+        <div>
+          <label style="display: block; font-size: 12px; color: #8b949e; margin-bottom: 4px; font-weight: 600;">Starting Capital State ID</label>
+          <input type="number" id="ccCapital" placeholder="e.g. 1 — the state it begins owning" style="width: 100%; padding: 6px 10px; background: #0d1117; border: 1px solid #30363d; border-radius: 4px; color: #c9d1d9; font-size: 13px;" required />
+          <div style="font-size:11px; color:#6e7681; margin-top:4px;">The new country starts owning this one state as its capital — add the rest of its territory on the Map.</div>
+          <div id="ccCapitalInfo" style="font-size:11px; margin-top:4px; min-height:14px; color:#8b949e;"></div>
+        </div>
+        <div>
+          <label style="display: flex; align-items: center; gap: 10px; font-size: 12px; color: #8b949e; font-weight: 600;">Map Colour
+            <input type="color" id="ccColor" value="#7d283c" style="width: 48px; height: 28px; padding: 0; border: 1px solid #30363d; border-radius: 4px; background: #0d1117; cursor: pointer;" />
+            <span style="font-weight:400; color:#6e7681;">(change it any time with the 🎨 picker on the Map)</span>
+          </label>
+        </div>
+        <div>
+          <label style="display: block; font-size: 12px; color: #8b949e; margin-bottom: 4px; font-weight: 600;">Graphical Culture</label>
+          <select id="ccGraphicalCulture" style="width: 100%; padding: 6px 10px; background: #0d1117; border: 1px solid #30363d; border-radius: 4px; color: #c9d1d9; font-size: 13px; cursor: pointer;">
+            <option value="western_european_gfx">Western European</option>
+            <option value="eastern_european_gfx">Eastern European</option>
+            <option value="asian_gfx">Asian</option>
+            <option value="southamerican_gfx">South American</option>
+            <option value="middle_eastern_gfx">Middle Eastern</option>
+            <option value="african_gfx">African</option>
+          </select>
+        </div>
+        <div style="margin-top: 8px; display: flex; justify-content: flex-end; gap: 8px;">
+          <button type="button" class="btn btn-secondary" id="ccCancelBtn">Cancel</button>
+          <button type="submit" class="btn" id="ccCreateBtn">Create</button>
+        </div>
+      </form>
+    </dialog>
+
+    <!-- National Spirit Picker Modal -->
+    <div id="spiritPickerModal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>Select Starting National Spirit</h2>
+          <span id="closeSpiritPicker" class="modal-close">&times;</span>
+        </div>
+        <input type="text" id="spiritPickerSearch" class="modal-search" placeholder="🔍 Search spirits by ID, name, or description..." />
+        <div id="spiritPickerGrid" class="modal-grid-spirits">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Technology Picker Modal -->
+    <div id="techPickerModal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>Select Starting Technology</h2>
+          <span id="closeTechPicker" class="modal-close">&times;</span>
+        </div>
+        <input type="text" id="techPickerSearch" class="modal-search" placeholder="🔍 Search technologies by ID..." />
+        <label style="display:flex; align-items:center; gap:6px; margin:0 0 8px; font-size:12px; color:#8b949e; cursor:pointer;">
+          <input type="checkbox" id="techPickerShowAll" style="margin:0;" />
+          Show all (include vanilla techs) — off shows only this mod + base mod
+        </label>
+        <div id="techPickerGrid" class="modal-grid-techs">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+    </div>
+
+    <script src="./nova-ai-parse.js"></script>
+    <script src="./tech-icon.js?v=4"></script>
+    <script src="country-setup.js?v=42"></script>
+    <script src="./ai-field-assist.js"></script>
+  <script src="./version-banner.js"></script>
+  </body>
+</html>

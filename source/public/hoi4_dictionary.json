@@ -1,0 +1,69 @@
+{
+  "categories": {
+    "politics": { "label": "Politics & Government", "icon": "⚖️", "color": "#e2b714" },
+    "military": { "label": "Military & War", "icon": "⚔️", "color": "#f84f31" },
+    "industry": { "label": "Industry & Infrastructure", "icon": "🏗️", "color": "#238636" },
+    "research": { "label": "Research & Technology", "icon": "🧪", "color": "#58a6ff" },
+    "diplomacy": { "label": "Diplomacy & States", "icon": "🗺️", "color": "#a371f7" },
+    "intelligence": { "label": "Intelligence & Espionage", "icon": "🕵️", "color": "#8b949e" },
+    "characters": { "label": "Characters & Leaders", "icon": "👤", "color": "#ff7b72" },
+    "logic": { "label": "Logic & Scopes", "icon": "🧠", "color": "#484f58" }
+  },
+  "commands": {
+    "add_political_power": { "label": "Add [AMOUNT] Political Power", "category": "politics", "params": [{ "name": "amount", "default": "100" }], "wizardMode": "amount_dialog" },
+    "add_stability": { "label": "Add [AMOUNT] Stability", "category": "politics", "params": [{ "name": "amount", "default": "0.05" }], "wizardMode": "amount_dialog" },
+    "add_war_support": { "label": "Add [AMOUNT] War Support", "category": "politics", "params": [{ "name": "amount", "default": "0.05" }], "wizardMode": "amount_dialog" },
+    "add_ideas": { "label": "Add National Spirit: [SPIRIT_ID]", "category": "politics", "params": [{ "name": "spirit_id", "default": "" }], "wizardMode": "idea_picker" },
+    "remove_ideas": { "label": "Remove National Spirit: [SPIRIT_ID]", "category": "politics", "params": [{ "name": "spirit_id", "default": "" }], "wizardMode": "idea_picker" },
+    "add_timed_idea": { "label": "Add Timed Spirit: [SPIRIT_ID] for [DAYS] days", "category": "politics", "params": [{ "name": "spirit_id", "default": "" }, { "name": "days", "default": "365" }], "wizardMode": "idea_picker" },
+    "set_politics": { "label": "Set Ruling Party to [RULING_PARTY]", "category": "politics", "params": [{ "name": "ruling_party", "default": "fascism" }], "wizardMode": "amount_dialog" },
+    "add_popularity": { "label": "Add [POPULARITY] popularity to [IDEOLOGY]", "category": "politics", "params": [{ "name": "ideology", "default": "fascism" }, { "name": "popularity", "default": "0.1" }], "wizardMode": "amount_dialog" },
+    "set_rule_of_law": { "label": "Set Rule of Law to [AMOUNT]", "category": "politics", "params": [{ "name": "amount", "default": "0.5" }], "wizardMode": "amount_dialog" },
+    "add_named_threat": { "label": "Increase Tension by [THREAT]", "category": "politics", "params": [{ "name": "threat", "default": "2.0" }], "wizardMode": "amount_dialog" },
+
+    "add_army_experience": { "label": "Add [AMOUNT] Army Experience", "category": "military", "params": [{ "name": "amount", "default": "10" }], "wizardMode": "amount_dialog" },
+    "add_navy_experience": { "label": "Add [AMOUNT] Navy Experience", "category": "military", "params": [{ "name": "amount", "default": "10" }], "wizardMode": "amount_dialog" },
+    "add_air_experience": { "label": "Add [AMOUNT] Air Experience", "category": "military", "params": [{ "name": "amount", "default": "10" }], "wizardMode": "amount_dialog" },
+    "add_command_power": { "label": "Add [AMOUNT] Command Power", "category": "military", "params": [{ "name": "amount", "default": "10" }], "wizardMode": "amount_dialog" },
+    "add_manpower": { "label": "Add [AMOUNT] Manpower", "category": "military", "params": [{ "name": "amount", "default": "10000" }], "wizardMode": "amount_dialog" },
+    "add_equipment_to_stockpile": { "label": "Add [AMOUNT] [TYPE] to Stockpile", "category": "military", "params": [{ "name": "type", "default": "infantry_equipment_1" }, { "name": "amount", "default": "1000" }], "wizardMode": "amount_dialog" },
+    "modify_tech_sharing_bonus": { "label": "Modify Tech Sharing Bonus by [BONUS]", "category": "military", "params": [{ "name": "bonus", "default": "0.1" }], "wizardMode": "amount_dialog" },
+
+    "add_building_construction": { "label": "Build [LEVEL] [BUILDING] in [STATE_ID]", "category": "industry", "params": [{ "name": "building", "default": "industrial_complex" }, { "name": "level", "default": "1" }, { "name": "state_id", "default": "" }], "wizardMode": "building_construction" },
+    "add_offsite_building": { "label": "Add [AMOUNT] Offsite [BUILDING]", "category": "industry", "params": [{ "name": "building", "default": "industrial_complex" }, { "name": "amount", "default": "1" }], "wizardMode": "offsite_building" },
+    "add_extra_state_shared_building_slots": { "label": "Add [AMOUNT] Building Slots in [STATE_ID]", "category": "industry", "params": [{ "name": "amount", "default": "1" }, { "name": "state_id", "default": "" }], "wizardMode": "state_building_slots" },
+    "add_resource": { "label": "Add [AMOUNT] [TYPE] in [STATE_ID]", "category": "industry", "params": [{ "name": "type", "default": "steel" }, { "name": "amount", "default": "8" }, { "name": "state_id", "default": "" }], "wizardMode": "amount_dialog" },
+    "modify_building_resources": { "label": "Modify Building Resources", "category": "industry", "params": [], "wizardMode": "resource_picker" },
+    "add_fuel": { "label": "Add [AMOUNT] Fuel", "category": "industry", "params": [{ "name": "amount", "default": "10000" }], "wizardMode": "amount_dialog" },
+
+    "add_research_slot": { "label": "Add [AMOUNT] Research Slot", "category": "research", "params": [{ "name": "amount", "default": "1" }], "wizardMode": "amount_dialog" },
+    "add_tech_bonus": { "label": "Add [BONUS] Research Bonus to [CATEGORY]", "category": "research", "params": [{ "name": "category", "default": "industry" }, { "name": "bonus", "default": "1.0" }], "wizardMode": "research_bonus" },
+    "add_doctrine_cost_reduction": { "label": "Reduce [CATEGORY] cost by [AMOUNT]", "category": "research", "params": [{ "name": "category", "default": "land_doctrine" }, { "name": "amount", "default": "0.1" }], "wizardMode": "doctrine_cost_reduction" },
+
+    "add_state_claim": { "label": "Add Claim to State [STATE_ID]", "category": "diplomacy", "params": [{ "name": "state_id", "default": "" }], "wizardMode": "amount_dialog" },
+    "add_state_core": { "label": "Add Core to State [STATE_ID]", "category": "diplomacy", "params": [{ "name": "state_id", "default": "" }], "wizardMode": "amount_dialog" },
+    "add_core_of": { "label": "Make [STATE_ID] a Core of [TAG]", "category": "diplomacy", "params": [{ "name": "state_id", "default": "" }, { "name": "tag", "default": "ROOT" }], "wizardMode": "amount_dialog" },
+    "transfer_state": { "label": "Transfer State [STATE_ID] to [TAG]", "category": "diplomacy", "params": [{ "name": "state_id", "default": "" }, { "name": "tag", "default": "GER" }], "wizardMode": "amount_dialog" },
+    "create_wargoal": { "label": "Create [TYPE] Wargoal on [TAG]", "category": "diplomacy", "params": [{ "name": "type", "default": "take_state_focus" }, { "name": "tag", "default": "" }], "wizardMode": "amount_dialog" },
+    "puppet": { "label": "Puppet [TAG]", "category": "diplomacy", "params": [{ "name": "tag", "default": "" }], "wizardMode": "amount_dialog" },
+    "annex_country": { "label": "Annex [TAG]", "category": "diplomacy", "params": [{ "name": "tag", "default": "" }], "wizardMode": "amount_dialog" },
+    "white_peace": { "label": "White Peace with [TAG]", "category": "diplomacy", "params": [{ "name": "tag", "default": "" }], "wizardMode": "amount_dialog" },
+
+    "create_operative": { "label": "Create Operative: [NAME]", "category": "intelligence", "params": [{ "name": "name", "default": "" }], "wizardMode": "amount_dialog" },
+    "add_intelligence_agency": { "label": "Add Intel Agency", "category": "intelligence", "params": [], "wizardMode": "amount_dialog" },
+    "add_agency_upgrade": { "label": "Upgrade Agency: [UPGRADE]", "category": "intelligence", "params": [{ "name": "upgrade", "default": "" }], "wizardMode": "amount_dialog" },
+
+    "create_country_leader": { "label": "Create Leader: [NAME]", "category": "characters", "params": [{ "name": "name", "default": "" }, { "name": "desc", "default": "" }, { "name": "picture", "default": "" }, { "name": "ideology", "default": "fascism" }], "wizardMode": "amount_dialog" },
+    "add_corps_commander": { "label": "Add General: [NAME]", "category": "characters", "params": [{ "name": "name", "default": "" }], "wizardMode": "amount_dialog" },
+    "add_unit_leader_trait": { "label": "Add Trait: [TRAIT]", "category": "characters", "params": [{ "name": "trait", "default": "" }], "wizardMode": "amount_dialog" },
+
+    "if": { "label": "IF ([CONDITION])", "category": "logic", "params": [{ "name": "condition", "default": "" }], "wizardMode": "logic_block" },
+    "limit": { "label": "LIMIT ([CONDITION])", "category": "logic", "params": [{ "name": "condition", "default": "" }], "wizardMode": "logic_block" },
+    "every_country": { "label": "EVERY COUNTRY", "category": "logic", "params": [], "wizardMode": "logic_block" },
+    "every_state": { "label": "EVERY STATE", "category": "logic", "params": [], "wizardMode": "logic_block" },
+    "random_list": { "label": "RANDOM LIST", "category": "logic", "params": [], "wizardMode": "logic_block" },
+    "NOT": { "label": "NOT", "category": "logic", "params": [], "wizardMode": "logic_block" },
+    "AND": { "label": "AND", "category": "logic", "params": [], "wizardMode": "logic_block" },
+    "OR": { "label": "OR", "category": "logic", "params": [], "wizardMode": "logic_block" }
+  }
+}

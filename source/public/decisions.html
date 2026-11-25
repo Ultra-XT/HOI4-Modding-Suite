@@ -1,0 +1,786 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Decision Maker — Nova Modding Suite</title>
+    <!-- Branded "Loading…" veil for slow server scans (mod switch / cold loads). See loading-overlay.js. -->
+    <script src="./nova-i18n.js?v=1"></script>
+    <script src="./nova-bug-report.js?v=2"></script>
+    <script src="./loading-overlay.js?v=oobnote6"></script>
+    <link rel="stylesheet" href="./styles.css?v=minimap25" />
+    <style>
+      .decisions-layout {
+        display: flex;
+        height: calc(100vh - 65px); /* Subtract top dock height */
+        overflow: hidden;
+      }
+      .decisions-sidebar {
+        width: 320px;
+        background: #11161e;
+        border-right: 1px solid #2d3440;
+        display: flex;
+        flex-direction: column;
+      }
+      .decisions-sidebar-header {
+        padding: 12px;
+        background: #1c232d;
+        border-bottom: 1px solid #2d3440;
+      }
+      .decisions-list {
+        flex: 1;
+        overflow-y: auto;
+        padding: 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .category-container {
+        background: #1a202a;
+        border: 1px solid #30363d;
+        border-radius: 6px;
+        padding: 8px;
+        margin-bottom: 8px;
+      }
+      .category-title {
+        font-weight: 600;
+        color: #e8a849;
+        margin-bottom: 8px;
+        font-size: 13px;
+        display: flex;
+        justify-content: space-between;
+      }
+      .decision-item {
+        padding: 6px 8px;
+        background: #232c3a;
+        border: 1px solid #30363d;
+        border-radius: 4px;
+        cursor: pointer;
+        color: #e6edf3;
+        font-size: 12px;
+        margin-bottom: 4px;
+      }
+      .decision-item:hover {
+        border-color: #58a6ff;
+      }
+      
+      .decisions-main {
+        flex: 1;
+        padding: 20px;
+        overflow-y: auto;
+        background: #0d1117;
+        display: flex;
+        gap: 24px;
+        align-items: start;
+        justify-content: center;
+      }
+      .decision-editor-panel {
+        background: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 8px;
+        padding: 24px;
+        flex: 1;
+        max-width: 760px;
+        margin: 0;
+      }
+
+      /* Live Preview Styling */
+      .decision-preview-panel {
+        width: 420px;
+        position: sticky;
+        top: 20px;
+        background: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 8px;
+        padding: 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        flex-shrink: 0;
+      }
+      .decision-preview-title {
+        font-size: 13px;
+        color: #8b949e;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .hoi4-decisions-board {
+        background: #0d0f13;
+        border: 2px solid #2f3440;
+        border-radius: 4px;
+        padding: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+      }
+      .hoi4-decision-cat-header {
+        background: linear-gradient(90deg, #2c1a0c 0%, #170e06 100%);
+        border: 1.5px solid #634320;
+        padding: 8px 12px;
+        font-size: 13px;
+        font-weight: bold;
+        color: #eab308;
+        border-radius: 3px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-family: sans-serif;
+      }
+      .hoi4-decision-row {
+        background: #181d26;
+        border: 1px solid #2a3447;
+        padding: 10px 12px;
+        border-radius: 3px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-family: sans-serif;
+        font-size: 12.5px;
+      }
+      .hoi4-decision-left {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .hoi4-decision-icon {
+        width: 24px;
+        height: 24px;
+        object-fit: contain;
+      }
+      .hoi4-decision-name {
+        color: #e6edf3;
+        font-weight: bold;
+      }
+      .hoi4-decision-right {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .hoi4-decision-cost {
+        color: #388bfd;
+        font-weight: 800;
+        font-size: 12px;
+        background: rgba(56, 139, 253, 0.1);
+        border: 1px solid rgba(56, 139, 253, 0.2);
+        padding: 2px 6px;
+        border-radius: 3px;
+      }
+      .hoi4-decision-checkbox {
+        width: 18px;
+        height: 18px;
+        border: 1.5px solid #62738d;
+        border-radius: 2px;
+        background: #11151c;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #2ea043;
+        font-weight: bold;
+        font-size: 11px;
+      }
+      .hoi4-decision-badge {
+        font-size: 11px;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-weight: bold;
+      }
+      .hoi4-decision-badge.timed {
+        background: rgba(234, 179, 8, 0.15);
+        border: 1px solid rgba(234, 179, 8, 0.3);
+        color: #eab308;
+      }
+      .hoi4-decision-badge.mission {
+        background: rgba(236, 72, 153, 0.15);
+        border: 1px solid rgba(236, 72, 153, 0.3);
+        color: #ec4899;
+      }
+      .form-group {
+        margin-bottom: 16px;
+      }
+      .form-group label {
+        display: block;
+        margin-bottom: 6px;
+        color: #c9d1d9;
+        font-weight: 600;
+        font-size: 13px;
+      }
+      .form-group input[type="text"],
+      .form-group input[type="number"],
+      .form-group textarea,
+      .form-group select {
+        width: 100%;
+        padding: 8px;
+        background: #0d1117;
+        border: 1px solid #30363d;
+        border-radius: 6px;
+        color: #c9d1d9;
+      }
+      .form-group textarea {
+        min-height: 80px;
+        resize: vertical;
+        font-family: monospace;
+      }
+      .btn {
+        padding: 8px 16px;
+        background: #238636;
+        color: #fff;
+        border: 1px solid rgba(240, 246, 252, 0.1);
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: 600;
+      }
+      .btn:hover {
+        background: #2ea043;
+      }
+      .btn-secondary {
+        background: #21262d;
+      }
+      .btn-secondary:hover {
+        background: #30363d;
+      }
+
+      .picture-upload-group {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      }
+      #decisionPicturePreview {
+        width: 50px;
+        height: 50px;
+        background: #0d1117;
+        border: 1px dashed #30363d;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #8b949e;
+        overflow: hidden;
+      }
+      #decisionPicturePreview img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+      }
+
+      .decision-toggle-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        padding: 10px 12px;
+        background: #0d1117;
+        border: 1px solid #30363d;
+        border-radius: 8px;
+      }
+      .decision-toggle-label {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .decision-toggle-label strong {
+        color: #c9d1d9;
+        font-size: 13px;
+      }
+      .decision-toggle-label span {
+        color: #8b949e;
+        font-size: 11px;
+      }
+      .decision-switch {
+        position: relative;
+        width: 52px;
+        height: 28px;
+        flex: 0 0 auto;
+      }
+      .decision-switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+      .decision-switch-track {
+        position: absolute;
+        inset: 0;
+        background: #3b1117;
+        border: 1px solid #7f1d1d;
+        border-radius: 999px;
+        cursor: pointer;
+        transition: background 0.18s ease, border-color 0.18s ease;
+      }
+      .decision-switch-track::before {
+        content: "";
+        position: absolute;
+        width: 20px;
+        height: 20px;
+        left: 4px;
+        top: 3px;
+        border-radius: 50%;
+        background: #f0f6fc;
+        transition: transform 0.18s ease;
+      }
+      .decision-switch input:checked + .decision-switch-track {
+        background: #12361f;
+        border-color: #2ea043;
+      }
+      .decision-switch input:checked + .decision-switch-track::before {
+        transform: translateX(23px);
+      }
+
+      /* AI GENERATOR */
+      .ai-generator-panel {
+        background: linear-gradient(145deg, #1c1328, #110d1a);
+        border: 1px solid #482f6e;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 24px;
+      }
+      .ai-generator-panel h3 {
+        margin: 0 0 12px 0;
+        color: #d1b4ff;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+    </style>
+    <link rel="icon" href="favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" href="favicon.png">
+</head>
+  <body>
+    <div id="topDock" class="top-dock">
+      <nav class="suite-nav">
+        <a href="home.html" class="suite-nav-link" data-i18n="nav.home">Home</a>
+        <a href="country-setup.html" class="suite-nav-link" data-i18n="nav.countrySetup">Country Setup</a>
+        <a href="characters.html" class="suite-nav-link" data-i18n="nav.characters">Characters</a>
+        <a href="ideas.html" class="suite-nav-link" data-i18n="nav.nationalSpirits">National Spirits</a>
+        <a href="research.html" class="suite-nav-link" data-i18n="nav.researchTree">Research Tree</a>
+        <a href="index.html" class="suite-nav-link" data-i18n="nav.focusTree">Focus Tree</a>
+        <a href="events.html" class="suite-nav-link" data-i18n="nav.events">Events</a>
+        <a href="decisions.html" class="suite-nav-link active" data-i18n="nav.decisions">Decisions</a>
+        <a href="map.html" class="suite-nav-link" data-i18n="nav.mapEditor">Map Editor</a>
+        <a href="army.html" class="suite-nav-link" data-i18n="nav.military">Military</a>
+        <a href="modhealth.html" class="suite-nav-link" data-i18n="nav.modHealth">Mod Health</a>
+
+        <!-- target="_blank" is load-bearing, not decoration. main.js blocks in-window navigation to any
+             non-app origin (will-navigate -> preventDefault + "network blocked" warning), but routes a
+             window-open to an https URL through shell.openExternal. So this opens the user's real browser;
+             a plain href would look like an error. -->
+        <a href="https://discord.gg/Z6P23hjEsM" target="_blank" rel="noopener noreferrer"
+           class="suite-nav-link suite-nav-discord" style="margin-left:auto;"
+           title="Join the Nova Discord — report bugs and ask questions"><svg class="suite-nav-discord-mark" viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true" focusable="false"><path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z"/></svg>Discord</a>
+      </nav>
+      <header class="app-header">
+        <div class="title-row">
+          <h1>HOI4 Decision Maker</h1>
+          <div class="header-actions">
+            <div class="mod-selector-container" style="display: flex; align-items: center; gap: 8px; margin-right: 16px; background: #21262d; padding: 6px 12px; border-radius: 6px; border: 1px solid #30363d;">
+              <span style="font-size: 12px; color: #8b949e; font-weight: 600; white-space: nowrap;">📁 Active Mod:</span>
+              <select id="headerModSelector" style="background: #0d1117; border: 1px solid #30363d; color: #c9d1d9; border-radius: 4px; padding: 4px 8px; font-size: 12px; outline: none; cursor: pointer; min-width: 150px; max-width: 300px;"></select>
+            </div>
+            <button class="btn" id="saveDecisionBtn">Save Decision</button>
+            <button class="btn btn-secondary" id="duplicateDecisionBtn" style="margin-left: 8px;" title="Make an editable copy of the loaded decision (new id, ready to save)">⧉ Duplicate</button>
+            <button class="btn btn-secondary is-hidden" id="deleteDecisionBtn" style="border-color: #f85149; color: #f85149; margin-left: 8px;">Delete Decision</button>
+          </div>
+        </div>
+      </header>
+    </div>
+
+    <div id="vanillaBanner" style="display: none; background: linear-gradient(90deg, #2a1800, #1a1000); border-bottom: 2px solid #d29922; padding: 10px 20px; text-align: center; font-size: 13px; color: #d29922; font-weight: 600;">
+      ⚠️ You are viewing <strong>Vanilla Game Files</strong> (read-only). To save changes, select or <a href="index.html" style="color: #58a6ff; text-decoration: underline;">create a mod</a> first.
+    </div>
+
+    <div class="decisions-layout">
+      <div class="decisions-sidebar">
+        <div class="decisions-sidebar-header">
+          <button class="btn btn-secondary" id="newDecisionBtn" style="width: 100%;">+ Create New Decision</button>
+        </div>
+        <div style="padding: 8px; border-bottom: 1px solid #2d3440; background: #141b24;">
+          <input type="text" id="decisionsListSearch" placeholder="🔍 Search decisions..." style="width: 100%; padding: 6px 12px; background: #0d1117; border: 1px solid #30363d; border-radius: 4px; color: #c9d1d9; font-size: 12px; outline: none;" />
+        </div>
+        <div class="decisions-list" id="decisionsList">
+          <div class="category-container">
+            <div class="category-title">
+              <span>custom_decisions</span>
+            </div>
+            <div class="decision-item">declare_war_decision</div>
+            <div class="decision-item">build_infrastructure_decision</div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="decisions-main">
+        <div class="decision-editor-panel">
+          
+          <div class="ai-generator-panel">
+            <h3>✨ AI Decision Logic Generator <span id="aiLogicHelpBtn" style="display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; background: #482f6e; color: #d1b4ff; font-size: 11px; cursor: pointer; font-weight: bold;" title="How does this work / How to get API Key?">?</span></h3>
+            <p style="font-size: 13px; color: #a18bbb; margin: 0 0 12px 0;">Describe what this decision should cost, and what effects it should have. The AI will write the exact Paradox script.</p>
+            <textarea id="aiDecisionPrompt" placeholder="e.g. Costs 50 Political Power, gives a temporary modifier for 365 days that adds +10% factory output, and adds 1 infrastructure in the capital." style="width: 100%; padding: 8px; background: #0b0711; border: 1px solid #482f6e; color: #e2d1fa; border-radius: 4px; min-height: 60px; margin-bottom: 8px;"></textarea>
+            <button class="btn" id="generateAiDecisionBtn" style="background: #5d3b8e; border-color: #8c60ce;">Generate Decision Script</button>
+            <span id="aiStatus" style="font-size: 12px; color: #8fa4b8; margin-left: 12px;"></span>
+          </div>
+
+          <div class="form-group">
+            <label>Category</label>
+            <select id="decisionCategory">
+              <option value="custom_decisions">custom_decisions</option>
+            </select>
+          </div>
+
+          <div class="form-group" style="display: flex; gap: 16px;">
+            <div style="flex: 1;">
+              <label>Decision ID</label>
+              <input type="text" id="decisionId" value="custom_decision_1" />
+            </div>
+            <div style="flex: 1;" id="costGroup">
+              <label>Political Power Cost <span style="color:#6e7681; font-weight:400; font-size:11px;">(a number, or a script variable)</span></label>
+              <input type="text" inputmode="numeric" id="decisionCost" value="50" placeholder="50 or my_cost_var" />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Decision Name</label>
+            <input type="text" id="decisionName" value="New Decision" />
+            <div id="decisionNameRendered" class="nova-loc-hint" style="display:none; margin-top:4px; font-size:11px; color:#8b949e;"></div>
+          </div>
+
+          <div class="form-group">
+            <label>Decision Icon (DDS or Upload PNG/JPG)</label>
+            <div class="picture-upload-group">
+              <div id="decisionPicturePreview">Icon</div>
+              <div style="display: flex; flex-direction: column; gap: 8px;">
+                <input type="text" id="decisionPictureId" placeholder="e.g. GFX_decision_custom" />
+                <input type="file" id="decisionPictureUpload" accept="image/png, image/jpeg" style="display: none;" />
+                <div style="display: flex; gap: 8px;">
+                  <button class="btn btn-secondary" id="decisionPictureUploadBtn" style="flex: 1;">Upload Custom Icon</button>
+                  <button class="btn btn-secondary" id="decisionBrowseIconBtn" style="flex: 1; background: #1f2937; border-color: #374151;">Browse Icons</button>
+                </div>
+                <span id="uploadStatus" style="font-size: 11px; color: #8b949e;">Upload a PNG to auto-convert to DDS</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- The CATEGORY's own art — the tab this decision sits under, not the decision's icon. The base
+               game ships 108 of these and nothing here could pick one, so every category Nova wrote was
+               stamped with the generic default. Left blank, that default is still what gets written. -->
+          <div class="form-group">
+            <label>Category Icon — the art on the decisions tab this sits under</label>
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <input type="text" id="decisionCategoryIcon" placeholder="GFX_decision_category_…  — blank keeps the category's current icon" style="flex: 2;" />
+              <button class="btn btn-secondary" id="decisionBrowseCategoryIconBtn" style="flex: 1; background: #1f2937; border-color: #374151;">Browse Category Icons</button>
+            </div>
+          </div>
+          <div class="form-group" style="display: flex; gap: 16px;">
+            <div style="flex: 1;">
+              <label>Decision Type</label>
+              <select id="decisionType">
+                <option value="normal">Normal Decision</option>
+                <option value="mission">Mission</option>
+              </select>
+            </div>
+            <div style="flex: 1;">
+              <label>Scope</label>
+              <select id="decisionScope">
+                <option value="country">Country-scoped</option>
+                <option value="state">State-scoped</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group" style="display: flex; gap: 16px;">
+            <div style="flex: 1;">
+              <label id="lblDecisionDays">Days to Remove <span style="color:#6e7681; font-weight:400; font-size:11px;">(0 = no timer, -1 = never expires)</span></label>
+              <input type="text" inputmode="numeric" id="decisionDays" value="365" placeholder="365, -1, or a variable" />
+            </div>
+            <div style="flex: 1;">
+              <label>Cooldown (Days)</label>
+              <input type="text" inputmode="numeric" id="decisionCooldown" placeholder="0 for none" value="0" />
+            </div>
+            <div style="flex: 1;">
+              <label>Fire Only Once?</label>
+              <select id="decisionFireOnce">
+                <option value="yes">Yes</option>
+                <option value="no">No</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group" id="targetTriggerGroup" style="display: none;">
+            <label>Target Trigger (State conditions, e.g. target_trigger = { is_core_of = ROOT })</label>
+            <textarea id="decisionTargetTrigger" placeholder="is_core_of = ROOT"></textarea>
+            <div class="genesis-preview" id="decisionTargetTriggerPreview" style="display:none;"></div>
+          </div>
+
+          <!-- Mission-only fields -->
+          <div class="form-group" id="activationGroup" style="display: none;">
+            <label>Activation <span style="color:#8b949e;font-weight:400;">(when this mission auto-starts — required, or the mission never triggers)</span></label>
+            <textarea id="decisionActivation" placeholder="has_completed_focus = some_focus"></textarea>
+            <div class="genesis-preview" id="decisionActivationPreview" style="display:none;"></div>
+          </div>
+          <div class="form-group" id="cancelTriggerGroup" style="display: none;">
+            <label>Cancel Trigger <span style="color:#8b949e;font-weight:400;">(optional — cancels the mission early if met)</span></label>
+            <textarea id="decisionCancelTrigger" placeholder=""></textarea>
+            <div class="genesis-preview" id="decisionCancelTriggerPreview" style="display:none;"></div>
+          </div>
+          <div class="form-group" id="isGoodGroup" style="display: none;">
+            <label>Is Good Mission? <span style="color:#8b949e;font-weight:400;">(good = green/reward; bad = red/penalty on timeout)</span></label>
+            <select id="decisionIsGood">
+              <option value="no">No (bad mission — avoid the timeout)</option>
+              <option value="yes">Yes (good mission — complete for reward)</option>
+            </select>
+          </div>
+
+          <!-- Without this a mission's complete_effect fires the moment `available` is true, so a mission
+               with no Available conditions completes and disappears on the same tick. Every mission in
+               vanilla and Millennium Dawn either has real Available conditions or sets this; the maker
+               couldn't write it at all. -->
+          <div class="form-group" id="selectableMissionGroup" style="display: none;">
+            <label>How does it complete? <span style="color:#8b949e;font-weight:400;">(waiting for a click is almost always what you want)</span></label>
+            <select id="decisionSelectableMission">
+              <option value="yes">The player clicks it once Available is met</option>
+              <option value="no">It completes on its own the moment Available is met</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <div class="decision-toggle-row">
+              <div class="decision-toggle-label">
+                <strong>Show Decision</strong>
+                <span id="decisionVisibleHint">Visible in the decision list</span>
+              </div>
+              <label class="decision-switch" for="decisionVisibleToggle">
+                <input type="checkbox" id="decisionVisibleToggle" checked />
+                <span class="decision-switch-track"></span>
+              </label>
+            </div>
+            <textarea id="decisionVisible" style="display: none;" aria-hidden="true"></textarea>
+          </div>
+          
+          <div class="form-group" id="decisionOwnerBridge"></div>
+
+          <div class="form-group">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 6px;">
+              <label style="margin: 0;" id="lblDecisionAvailable">Available Trigger (Conditions to take decision)</label>
+              <div class="effect-quick-inserts" style="display: flex; gap: 6px;">
+                <button class="quick-insert-btn" data-target="decisionAvailable" data-type="spirit" type="button" style="background: #1f2937; border: 1px solid #374151; color: #10b981; font-size: 11px; padding: 2px 6px; border-radius: 4px; cursor: pointer; font-weight: 600;">+ Spirit</button>
+                <button class="quick-insert-btn" data-target="decisionAvailable" data-type="tech" type="button" style="background: #1f2937; border: 1px solid #374151; color: #3b82f6; font-size: 11px; padding: 2px 6px; border-radius: 4px; cursor: pointer; font-weight: 600;">+ Tech</button>
+                <button class="quick-insert-btn" data-target="decisionAvailable" data-type="event" type="button" style="background: #1f2937; border: 1px solid #374151; color: #ec4899; font-size: 11px; padding: 2px 6px; border-radius: 4px; cursor: pointer; font-weight: 600;">+ Event</button>
+                <button class="quick-insert-btn" data-target="decisionAvailable" data-type="decision" type="button" style="background: #1f2937; border: 1px solid #374151; color: #eab308; font-size: 11px; padding: 2px 6px; border-radius: 4px; cursor: pointer; font-weight: 600;">+ Decision</button>
+              </div>
+            </div>
+            <textarea id="decisionAvailable" placeholder="has_political_power > 50"></textarea>
+            <div class="genesis-preview" id="decisionAvailablePreview" style="display:none;"></div>
+          </div>
+
+          <div class="form-group">
+            <label style="margin: 0 0 6px; display:block;">Allowed — which countries ever get this decision <span style="color:#8b949e; font-weight:normal; font-size:11px;">(checked once at game start; leave blank for everyone, e.g. <code>original_tag = GRE</code>)</span></label>
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px; flex-wrap:wrap;">
+              <label for="decisionCountryLock" style="margin:0; font-size:12px; color:#8b949e; white-space:nowrap;">Restrict to country:</label>
+              <select id="decisionCountryLock" style="flex:0 1 280px; background:#0d1117; color:#c9d1d9; border:1px solid #30363d; border-radius:5px; padding:5px 8px; font-size:12px;">
+                <option value="">— Any country (no restriction) —</option>
+              </select>
+              <span style="font-size:11px; color:#6e7681;">writes <code>tag = …</code> into Allowed for you</span>
+            </div>
+            <textarea id="decisionAllowed" placeholder="original_tag = GRE"></textarea>
+            <div class="genesis-preview" id="decisionAllowedPreview" style="display:none;"></div>
+          </div>
+
+          <div class="form-group">
+            <label style="margin: 0 0 6px; display:block;">AI Will Do — how eagerly the AI takes this <span style="color:#8b949e; font-weight:normal; font-size:11px;">(leave blank for default; <code>factor = 0</code> = AI never takes it)</span></label>
+            <textarea id="decisionAiWillDo" placeholder="factor = 10"></textarea>
+          </div>
+
+          <div class="form-group">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 6px;">
+              <label style="margin: 0;">Modifier (Passive bonuses while active)</label>
+              <div class="effect-quick-inserts" style="display: flex; gap: 6px;">
+                <button class="quick-insert-btn" data-target="decisionModifier" data-type="spirit" type="button" style="background: #1f2937; border: 1px solid #374151; color: #10b981; font-size: 11px; padding: 2px 6px; border-radius: 4px; cursor: pointer; font-weight: 600;">+ Spirit</button>
+                <button class="quick-insert-btn" data-target="decisionModifier" data-type="tech" type="button" style="background: #1f2937; border: 1px solid #374151; color: #3b82f6; font-size: 11px; padding: 2px 6px; border-radius: 4px; cursor: pointer; font-weight: 600;">+ Tech</button>
+                <button class="quick-insert-btn" data-target="decisionModifier" data-type="event" type="button" style="background: #1f2937; border: 1px solid #374151; color: #ec4899; font-size: 11px; padding: 2px 6px; border-radius: 4px; cursor: pointer; font-weight: 600;">+ Event</button>
+                <button class="quick-insert-btn" data-target="decisionModifier" data-type="decision" type="button" style="background: #1f2937; border: 1px solid #374151; color: #eab308; font-size: 11px; padding: 2px 6px; border-radius: 4px; cursor: pointer; font-weight: 600;">+ Decision</button>
+              </div>
+            </div>
+            <textarea id="decisionModifier" placeholder="industrial_capacity_factory = 0.1"></textarea>
+            <div class="genesis-preview" id="decisionModifierPreview" style="display:none;"></div>
+          </div>
+ 
+          <div class="form-group">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 6px;">
+              <label style="margin: 0;">Complete Effect (One-time effects on click)</label>
+              <div class="effect-quick-inserts" style="display: flex; gap: 6px;">
+                <button class="quick-insert-btn" data-target="decisionEffect" data-type="spirit" type="button" style="background: #1f2937; border: 1px solid #374151; color: #10b981; font-size: 11px; padding: 2px 6px; border-radius: 4px; cursor: pointer; font-weight: 600;">+ Spirit</button>
+                <button class="quick-insert-btn" data-target="decisionEffect" data-type="tech" type="button" style="background: #1f2937; border: 1px solid #374151; color: #3b82f6; font-size: 11px; padding: 2px 6px; border-radius: 4px; cursor: pointer; font-weight: 600;">+ Tech</button>
+                <button class="quick-insert-btn" data-target="decisionEffect" data-type="event" type="button" style="background: #1f2937; border: 1px solid #374151; color: #ec4899; font-size: 11px; padding: 2px 6px; border-radius: 4px; cursor: pointer; font-weight: 600;">+ Event</button>
+                <button class="quick-insert-btn" data-target="decisionEffect" data-type="decision" type="button" style="background: #1f2937; border: 1px solid #374151; color: #eab308; font-size: 11px; padding: 2px 6px; border-radius: 4px; cursor: pointer; font-weight: 600;">+ Decision</button>
+              </div>
+            </div>
+            <textarea id="decisionEffect" placeholder="add_political_power = -50"></textarea>
+            <div class="genesis-preview" id="decisionEffectPreview" style="display:none;"></div>
+          </div>
+
+          <div class="form-group">
+            <label id="lblRemoveEffect">Remove Effect (Runs when timed decision expires)</label>
+            <textarea id="decisionRemoveEffect" placeholder="e.g. add_stability = -0.05"></textarea>
+            <div class="genesis-preview" id="decisionRemoveEffectPreview" style="display:none;"></div>
+          </div>
+
+          <!-- ⚙️ Advanced decision options. Every field here is optional and round-trip safe (an
+               existing decision's value is loaded back in, so editing never drops it). -->
+          <details class="form-group" id="decisionAdvanced" style="border:1px solid #30363d; border-radius:6px; padding:8px 12px; background:#0d1117;">
+            <summary style="cursor:pointer; font-weight:600; color:#c9d1d9; user-select:none;">⚙️ Advanced options <span style="color:#6e7681; font-weight:400; font-size:11px;">— priority, custom cost, targeted modifier, map highlighting…</span></summary>
+            <div style="margin-top:14px; display:flex; flex-direction:column; gap:16px;">
+
+              <div style="display:flex; gap:16px;">
+                <div style="flex:1;">
+                  <label>Priority <span style="color:#6e7681; font-weight:400; font-size:11px;">(higher = nearer the top of the list; blank = default)</span></label>
+                  <input type="text" inputmode="numeric" id="decisionPriority" placeholder="e.g. 100" />
+                </div>
+                <div style="flex:1;">
+                  <label>Cancel if not visible?</label>
+                  <select id="decisionCancelIfNotVisible">
+                    <option value="">Default (no)</option>
+                    <option value="yes">Yes — a timed decision auto-cancels when its Show/Visible triggers stop matching</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label>Custom cost text <span style="color:#6e7681; font-weight:400; font-size:11px;">(a localisation key shown instead of the PP cost, e.g. <code>my_decision_cost</code>)</span></label>
+                <input type="text" id="decisionCustomCostText" placeholder="e.g. GER_build_cost" />
+              </div>
+              <div>
+                <label>Custom cost trigger <span style="color:#6e7681; font-weight:400; font-size:11px;">(when the custom cost is affordable, e.g. <code>command_power &gt; 25</code>)</span></label>
+                <textarea id="decisionCustomCostTrigger" placeholder="command_power > 25"></textarea>
+              </div>
+
+              <div>
+                <label>Targeted modifier <span style="color:#6e7681; font-weight:400; font-size:11px;">(a modifier applied to a target country while active — include a <code>tag = X</code> / <code>tag = FROM</code> line and modifier lines)</span></label>
+                <textarea id="decisionTargetedModifier" placeholder="tag = GER&#10;attack_bonus_against = 0.1"></textarea>
+              </div>
+
+              <div>
+                <label>Remove trigger <span style="color:#6e7681; font-weight:400; font-size:11px;">(instantly removes a timed decision AND fires its Remove Effect when met)</span></label>
+                <textarea id="decisionRemoveTrigger" placeholder="has_war = no"></textarea>
+              </div>
+
+              <!-- Keys real content leans on that the maker previously could not author at all. Counts are
+                   occurrences in vanilla / Millennium Dawn, measured over their common/decisions folders. -->
+              <div>
+                <label>Cancel trigger <span style="color:#6e7681; font-weight:400; font-size:11px;">(cancels a running decision WITHOUT firing its remove effect — 603 vanilla / 139 MD decisions use this, and 481 of vanilla's are ordinary decisions, not missions)</span></label>
+                <textarea id="decisionCancelTriggerAdv" placeholder="has_war = no"></textarea>
+              </div>
+              <div>
+                <label>Cancel effect <span style="color:#6e7681; font-weight:400; font-size:11px;">(runs when the Cancel trigger fires — 382 / 70)</span></label>
+                <textarea id="decisionCancelEffect" placeholder="add_political_power = -10"></textarea>
+              </div>
+              <div>
+                <label>Target root trigger <span style="color:#6e7681; font-weight:400; font-size:11px;">(checked ONCE on the deciding country before any target is evaluated — the documented way to keep a targeted decision cheap; 278 / 29)</span></label>
+                <textarea id="decisionTargetRootTrigger" placeholder="has_war = yes"></textarea>
+              </div>
+
+              <div style="display:flex; gap:16px;">
+                <div style="flex:1;">
+                  <label>Target array <span style="color:#6e7681; font-weight:400; font-size:11px;">(aim it at a scripted array instead of listing targets — 186 / 43)</span></label>
+                  <input type="text" id="decisionTargetArray" placeholder="e.g. global.my_target_array" />
+                </div>
+                <div style="flex:1;">
+                  <label>AI PP-cost hint <span style="color:#6e7681; font-weight:400; font-size:11px;">(what the AI should budget when the cost is custom — 72 / 0)</span></label>
+                  <input type="text" inputmode="numeric" id="decisionAiHintPpCost" placeholder="e.g. 150" />
+                </div>
+              </div>
+
+              <div style="display:flex; gap:16px;">
+                <div style="flex:1;">
+                  <label>Fixed random seed? <span style="color:#6e7681; font-weight:400; font-size:11px;">(102 / 254)</span></label>
+                  <select id="decisionFixedRandomSeed">
+                    <option value="">Default (yes)</option>
+                    <option value="no">No — reroll random_list each time it is evaluated</option>
+                    <option value="yes">Yes — keep the same roll</option>
+                  </select>
+                </div>
+                <div style="flex:1;">
+                  <label>Target non-existing? <span style="color:#6e7681; font-weight:400; font-size:11px;">(offer countries that aren't in the game yet — 11 / 4)</span></label>
+                  <select id="decisionTargetNonExisting">
+                    <option value="">Default (no)</option>
+                    <option value="yes">Yes</option>
+                  </select>
+                </div>
+                <div style="flex:1;">
+                  <label>Targets dynamic? <span style="color:#6e7681; font-weight:400; font-size:11px;">(re-evaluate the target list as the game runs — 50 / 1)</span></label>
+                  <select id="decisionTargetsDynamic">
+                    <option value="">Default (no)</option>
+                    <option value="yes">Yes</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- State-decision-only: shown when Scope = State-scoped -->
+              <div id="decisionStateAdvanced" style="display:none; flex-direction:column; gap:16px;">
+                <div>
+                  <label>On-map display <span style="color:#6e7681; font-weight:400; font-size:11px;">(where a state-targeted decision appears)</span></label>
+                  <select id="decisionOnMapMode">
+                    <option value="">Default (map &amp; decisions view)</option>
+                    <option value="map_and_decisions_view">Map &amp; decisions view</option>
+                    <option value="map_only">Map only</option>
+                    <option value="decision_view_only">Decisions view only</option>
+                  </select>
+                </div>
+                <div>
+                  <label>Highlight states <span style="color:#6e7681; font-weight:400; font-size:11px;">(body of <code>highlight_states = { … }</code> — states to highlight on the map when hovered)</span></label>
+                  <textarea id="decisionHighlightStates" placeholder="highlight_state_targets = { state = 1 state = 2 }&#10;highlight_color_while_active = 3"></textarea>
+                </div>
+              </div>
+
+            </div>
+          </details>
+
+        </div>
+
+        <!-- Live Preview Panel -->
+        <div class="decision-preview-panel">
+          <div class="decision-preview-title">📂 In-Game Decisions Board Preview</div>
+          <div class="hoi4-decisions-board">
+            <div class="hoi4-decision-cat-header">
+              <span id="previewDecCat">CUSTOM_DECISIONS</span>
+            </div>
+            <div class="hoi4-decision-row">
+              <div class="hoi4-decision-left">
+                <img id="previewDecIcon" src="/api/vanilla-ui?rel=gfx/interface/decisions/decision_generic_decision.dds" class="hoi4-decision-icon" data-fallback="/api/vanilla-ui?rel=gfx/interface/decisions/decision_generic_decision.dds" />
+                <span id="previewDecName" class="hoi4-decision-name">New Decision</span>
+              </div>
+              <div class="hoi4-decision-right">
+                <span id="previewDecCost" class="hoi4-decision-cost">50 PP</span>
+                <span id="previewDecBadge" class="hoi4-decision-badge"></span>
+                <div class="hoi4-decision-checkbox">✔</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div id="decisionIconPickerModal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>Select Decision Icon</h2>
+          <span id="closeDecisionIconPicker" class="modal-close">&times;</span>
+        </div>
+        <input type="text" id="decisionIconPickerSearch" class="modal-search" placeholder="Search decision icons by name..." />
+        <div id="decisionIconPickerGrid" class="modal-grid-focus-icons">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+    </div>
+    
+    <script src="./genesis-engine.js?v=23"></script>
+    <script src="./genesis-scripted-loader.js?v=1"></script>
+    <script src="./nova-ai-parse.js"></script>
+    <script src="./country-picker.js"></script>
+    <script src="./owner-bridge.js"></script>
+    <script src="decisions.js?v=modpath47"></script>
+    <script src="./ai-field-assist.js"></script>
+    <script src="./save-shortcut.js?v=2"></script>
+  <script src="./version-banner.js"></script>
+  </body>
+</html>

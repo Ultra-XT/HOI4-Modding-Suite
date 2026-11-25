@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Nova Modding Suite</title>
+  <style>
+    /* Self-contained: the splash loads from file:// before the server is ready, so it must
+       have ZERO external dependencies (no fonts, no /api, no other css/js files). Progress is
+       fed in over IPC by the Electron main process (see splash-preload.js + main.js). */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      height: 100%;
+      overflow: hidden;
+      background: #0d1117;
+      font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+      color: #c9d1d9;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .splash {
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 22px;
+      background:
+        radial-gradient(at 30% 20%, rgba(168, 85, 247, 0.16) 0px, transparent 55%),
+        radial-gradient(at 75% 80%, rgba(56, 139, 253, 0.14) 0px, transparent 55%),
+        #0d1117;
+      position: relative;
+      /* The splash is a frameless window — make the whole surface a drag handle so the user can move
+         it out of the way of their other windows while it loads. */
+      -webkit-app-region: drag;
+      cursor: grab;
+    }
+    .splash::before {
+      content: "";
+      position: absolute; inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+      background-size: 46px 46px;
+      pointer-events: none;
+    }
+
+    .planet {
+      font-size: 64px;
+      line-height: 1;
+      filter: drop-shadow(0 0 22px rgba(168, 85, 247, 0.55));
+      animation: float 3.2s ease-in-out infinite;
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(0) rotate(-4deg); }
+      50%      { transform: translateY(-10px) rotate(4deg); }
+    }
+
+    .title {
+      font-size: 34px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      background: linear-gradient(135deg, #a855f7 0%, #3b82f6 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .subtitle {
+      font-size: 13px;
+      color: #8b949e;
+      margin-top: -14px;
+      letter-spacing: 0.3px;
+    }
+
+    /* Determinate progress bar — the fill width tracks the real cache-warm progress. */
+    .bar {
+      width: 300px;
+      height: 6px;
+      border-radius: 6px;
+      background: rgba(148, 163, 184, 0.14);
+      overflow: hidden;
+      position: relative;
+      box-shadow: inset 0 0 0 1px rgba(148,163,184,0.08);
+    }
+    .fill {
+      position: absolute;
+      top: 0; left: 0; height: 100%; width: 0%;
+      border-radius: 6px;
+      background: linear-gradient(90deg, #a855f7, #3b82f6);
+      box-shadow: 0 0 12px rgba(99, 102, 241, 0.55);
+      transition: width 0.12s linear;
+    }
+    /* moving sheen over the fill so it reads as active even between progress ticks */
+    .fill::after {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; height: 100%; width: 60px;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent);
+      animation: sheen 1.4s ease-in-out infinite;
+    }
+    @keyframes sheen {
+      0%   { transform: translateX(-60px); }
+      100% { transform: translateX(300px); }
+    }
+
+    .meta {
+      width: 300px;
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .status {
+      font-size: 13px;
+      color: #adbac7;
+      min-height: 18px;
+      letter-spacing: 0.2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .pct {
+      font-size: 13px;
+      font-weight: 700;
+      color: #c9d1d9;
+      font-variant-numeric: tabular-nums;
+    }
+    .hint {
+      position: absolute;
+      bottom: 20px;
+      font-size: 11px;
+      color: #6e7681;
+      text-align: center;
+      padding: 0 20px;
+    }
+  </style>
+  <link rel="icon" href="favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" href="favicon.png">
+</head>
+<body>
+  <div class="splash">
+    <div class="planet">🪐</div>
+    <div><div class="title">Nova Modding Suite</div></div>
+    <div class="subtitle">Hearts of Iron IV — Visual Country Creator</div>
+    <div class="bar" aria-hidden="true"><div class="fill" id="fill"></div></div>
+    <div class="meta">
+      <div class="status" id="status">Starting up…</div>
+      <div class="pct" id="pct">0%</div>
+    </div>
+    <div class="hint">
+      <span id="firstRunNote">The first launch for a big mod can take a minute or two while it builds caches — this only happens once; later launches are quick.</span><br/>
+      <span style="opacity:0.7">You can drag this window anywhere.</span>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var fillEl = document.getElementById("fill");
+      var statusEl = document.getElementById("status");
+      var pctEl = document.getElementById("pct");
+
+      var target = 0;     // last REAL percentage reported by the warm-up
+      var softCap = 5;    // how far the gentle creep may run past `target` during a stuck step
+      var display = 0;    // the value actually drawn (eased toward target)
+      var label = "Starting up…";
+      var gotReal = false;
+      var lastRealAt = Date.now();
+      var startedAt = Date.now();
+      var firstRunNoteEl = document.getElementById("firstRunNote");
+
+      // Show elapsed time once things run long, so a slow first launch never looks hung/bugged.
+      setInterval(function () {
+        if (!firstRunNoteEl) return;
+        var secs = Math.round((Date.now() - startedAt) / 1000);
+        if (secs >= 4) {
+          firstRunNoteEl.textContent =
+            "Building this mod's caches… " + secs + "s elapsed. First launch can take a minute or two; this only happens once.";
+        }
+      }, 1000);
+
+      function setProgress(pct, lbl) {
+        var n = Number(pct);
+        if (isFinite(n)) {
+          target = Math.max(target, Math.min(100, n));      // never go backwards
+          softCap = Math.min(99.5, target + 7);             // creep a little past a stuck milestone
+        }
+        if (lbl) label = String(lbl);
+        gotReal = true;
+        lastRealAt = Date.now();
+        render(); // repaint immediately on every real update, independent of the easing interval
+      }
+
+      function render() {
+        fillEl.style.width = display.toFixed(1) + "%";
+        pctEl.textContent = Math.round(display) + "%";
+        statusEl.textContent = label;
+      }
+
+      // ~60fps tick. Driven by setInterval (not requestAnimationFrame) so the bar keeps animating
+      // even if the splash window is briefly occluded/unfocused, where rAF would be throttled.
+      function frame() {
+        if (display < target) {
+          // ease quickly toward a freshly-reported milestone
+          display += Math.max(0.5, (target - display) * 0.16);
+          if (display > target) display = target;
+        } else if (display < softCap) {
+          // gentle creep so a long single step (e.g. parsing the icon atlas) never looks frozen
+          display += 0.06;
+          if (display > softCap) display = softCap;
+        }
+        if (display > 100) display = 100;
+        render();
+      }
+
+      // Real progress comes over IPC from the Electron main process.
+      try {
+        if (window.novaSplash && typeof window.novaSplash.onProgress === "function") {
+          window.novaSplash.onProgress(function (data) {
+            if (data && typeof data === "object") setProgress(data.pct, data.label);
+          });
+        }
+      } catch (_e) { /* ignore */ }
+
+      // Fallback: if no IPC progress arrives shortly (e.g. opened in a plain browser, or the preload
+      // failed to load), auto-advance slowly toward ~92% so the bar still looks alive. Real progress,
+      // if it ever arrives, immediately takes over via Math.max in setProgress.
+      setInterval(function () {
+        if (!gotReal && target < 92) {
+          target += 1.5;
+          softCap = Math.min(99.5, target + 7);
+        }
+      }, 220);
+
+      setInterval(frame, 33);
+      render();
+    })();
+  </script>
+</body>
+</html>

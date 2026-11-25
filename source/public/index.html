@@ -1,0 +1,1355 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Focus Tree — Nova Modding Suite</title>
+    <!-- Branded "Loading…" veil for slow server scans (mod switch / cold loads). See loading-overlay.js. -->
+    <script src="./nova-i18n.js?v=1"></script>
+    <script src="./nova-bug-report.js?v=2"></script>
+    <script src="./loading-overlay.js?v=oobnote6"></script>
+    <script src="./nova-combo.js?v=5"></script>
+    <link rel="stylesheet" href="./styles.css?v=focustheme5" />
+    <style>
+      .empty-tree-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(11, 7, 17, 0.8);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        z-index: 100;
+      }
+      
+      .empty-tree-card {
+        background: rgba(22, 27, 34, 0.95);
+        border: 1px solid rgba(168, 85, 247, 0.3);
+        border-radius: 14px;
+        padding: 32px;
+        max-width: 480px;
+        text-align: center;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 15px rgba(168, 85, 247, 0.15);
+        animation: fadeInScale 0.3s ease-out;
+      }
+      
+      @keyframes fadeInScale {
+        from { opacity: 0; transform: scale(0.95); }
+        to { opacity: 1; transform: scale(1); }
+      }
+      
+      .empty-tree-icon {
+        font-size: 48px;
+        margin-bottom: 16px;
+      }
+      
+      .empty-tree-card h2 {
+        font-size: 20px;
+        color: #f0f6fc;
+        margin: 0 0 8px 0;
+        font-family: sans-serif;
+        font-weight: 700;
+      }
+      
+      .empty-tree-card p {
+        font-size: 13px;
+        color: #8b949e;
+        line-height: 1.5;
+        margin: 0 0 24px 0;
+      }
+    </style>
+    <link rel="icon" href="favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" href="favicon.png">
+</head>
+  <body>
+    <div id="topDock" class="top-dock">
+      <nav class="suite-nav">
+        <a href="home.html" class="suite-nav-link" data-i18n="nav.home">Home</a>
+        <a href="country-setup.html" class="suite-nav-link" data-i18n="nav.countrySetup">Country Setup</a>
+        <a href="characters.html" class="suite-nav-link" data-i18n="nav.characters">Characters</a>
+        <a href="ideas.html" class="suite-nav-link" data-i18n="nav.nationalSpirits">National Spirits</a>
+        <a href="research.html" class="suite-nav-link" data-i18n="nav.researchTree">Research Tree</a>
+        <a href="index.html" class="suite-nav-link active" data-i18n="nav.focusTree">Focus Tree</a>
+        <a href="events.html" class="suite-nav-link" data-i18n="nav.events">Events</a>
+        <a href="decisions.html" class="suite-nav-link" data-i18n="nav.decisions">Decisions</a>
+        <a href="map.html" class="suite-nav-link" data-i18n="nav.mapEditor">Map Editor</a>
+        <a href="army.html" class="suite-nav-link" data-i18n="nav.military">Military</a>
+        <a href="modhealth.html" class="suite-nav-link" data-i18n="nav.modHealth">Mod Health</a>
+
+        <!-- target="_blank" is load-bearing, not decoration. main.js blocks in-window navigation to any
+             non-app origin (will-navigate -> preventDefault + "network blocked" warning), but routes a
+             window-open to an https URL through shell.openExternal. So this opens the user's real browser;
+             a plain href would look like an error. -->
+        <a href="https://discord.gg/Z6P23hjEsM" target="_blank" rel="noopener noreferrer"
+           class="suite-nav-link suite-nav-discord" style="margin-left:auto;"
+           title="Join the Nova Discord — report bugs and ask questions"><svg class="suite-nav-discord-mark" viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true" focusable="false"><path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z"/></svg>Discord</a>
+      </nav>
+      <header class="app-header">
+        <div class="title-row">
+          <h1>🎯 Focus Tree Editor</h1>
+          <div class="header-actions">
+            <button type="button" id="simToggleBtn" class="debug-toggle-btn" title="Toggle Simulator Mode">Simulator</button>
+            <button type="button" id="minimapToggleBtn" class="debug-toggle-btn" title="Toggle Minimap">Minimap</button>
+            <button type="button" id="settingsToggleBtn" class="debug-toggle-btn" title="Open Editor Settings">Settings</button>
+            <button type="button" id="helpBtn" class="help-btn" aria-label="Help" title="Help">?</button>
+          </div>
+        </div>
+      </header>
+
+      <section class="toolbar">
+        <div class="path-row">
+          <div class="toolbar-group">
+            <label for="focusModSelector">Active mod</label>
+            <select id="focusModSelector" title="Switch which mod the country list + saves target" style="padding: 5px 6px; background: #0d1117; border: 1px solid #30363d; color: #c9d1d9; border-radius: 6px; font-size: 12px; max-width: 200px;">
+              <option value="">Loading mods…</option>
+            </select>
+          </div>
+          <div class="toolbar-group path-input-group">
+            <label for="filePath" class="tb-file-label" title="The loaded focus-tree file — read-only; use Load to open another">📄 File</label>
+            <input
+              id="filePath"
+              type="text"
+              readonly
+              tabindex="-1"
+              class="path-row-file-input"
+              aria-readonly="true"
+              placeholder="none — use Load"
+              title="Shows the loaded file after you use Load. This field is read-only; pick another file with Load."
+            />
+          </div>
+          <div class="toolbar-group">
+            <button id="loadBtn">Load</button>
+            <select id="countryTreeSelect" title="Jump straight to a country that already has a focus tree in your active mod" style="max-width: 210px; padding: 4px 6px; background: #0d1117; border: 1px solid #30363d; color: #c9d1d9; border-radius: 6px; font-size: 12px;">
+              <option value="">Open a country's tree…</option>
+            </select>
+            <button id="newFocusTreeBtn" type="button" title="Create a brand-new focus tree in your active mod (starts from the generic tree), then pick which country uses it. For countries that don't have their own tree yet.">+ New Tree</button>
+          </div>
+          <div class="tb-divider" aria-hidden="true"></div>
+          <div class="toolbar-group">
+            <button id="saveBtn" disabled>Save</button>
+            <button id="undoBtn" disabled title="Undo (Ctrl+Z)">Undo</button>
+            <button id="redoBtn" disabled title="Redo (Ctrl+Y)">Redo</button>
+          </div>
+          <div class="tb-divider" aria-hidden="true"></div>
+          <div class="toolbar-group">
+            <button id="treeOwnerBtn" type="button" title="A focus-tree file isn't automatically tied to any country. This writes the in-game `country` selector so YOUR country actually loads this tree — and, with a high enough weight, uses it instead of the base mod's tree (e.g. Millennium Dawn's). You normally set this once per tree; it opens automatically after Copy Generic Tree." disabled>Which Country Uses This…</button>
+          </div>
+          <!-- Shared-focus controls (👁 toggle + ⚙ Manage) are injected here by updateSharedFocusToggle when a
+               tree with inherited branches is loaded — in the toolbar, NOT floating over the tree. -->
+          <div class="toolbar-group" id="sharedFocusToolbarGroup"></div>
+          <div class="tb-divider" aria-hidden="true"></div>
+          <div class="toolbar-group tb-zoom">
+            <button id="zoomOutBtn" title="Zoom out (keyboard Z)" aria-label="Zoom out">−</button>
+            <span id="zoomLabel">100%</span>
+            <button id="zoomInBtn" title="Zoom in (keyboard X)" aria-label="Zoom in">+</button>
+          </div>
+          <div class="switch-container" title="Autosave every 30s while there are unsaved changes.">
+            <span class="switch-label">Autosave</span>
+            <label class="switch">
+              <input id="autosaveToggle" type="checkbox" />
+              <span class="slider round"></span>
+            </label>
+          </div>
+        </div>
+        <div class="status-row">
+          <span id="statusText" class="status-text" role="status" aria-live="polite" aria-atomic="true">Idle</span>
+        </div>
+        <div class="focus-edit-row">
+          <div class="toolbar-group focus-id-group">
+            <label for="focusIdInput">Selected Focus ID</label>
+            <input id="focusIdInput" type="text" placeholder="Select one focus to edit ID" />
+            <button id="applyFocusIdBtn" type="button" disabled>Apply ID</button>
+          </div>
+
+          <div class="search-v-separator"></div>
+
+          <div class="toolbar-group focus-search-group">
+            <label for="globalFocusSearch" class="search-label">Search:</label>
+            <div class="search-container">
+              <input id="globalFocusSearch" type="search" placeholder="ID or Name (Ctrl+F)..." autocomplete="off" />
+              <div id="focusSearchList" class="search-results-list search-results-list--hidden"></div>
+            </div>
+          </div>
+
+          <div class="toolbar-group">
+            <button id="addFocusBtn" type="button">Add Focus</button>
+            <button id="deleteFocusBtn" type="button" disabled>Delete Selected</button>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <dialog id="debuggerDialog" class="debugger-dialog">
+      <div class="debugger-dialog-header">
+        <h2 class="debugger-dialog-title">Debugger & Diagnostics</h2>
+        <button type="button" id="debuggerCloseBtn" class="debugger-close-btn">&times;</button>
+      </div>
+      <div class="debugger-dialog-body">
+        <div id="rootInfo" class="root-info-block"></div>
+        <div id="diagnostics" class="diagnostics-block"></div>
+        <div id="debugPanel" class="debug-panel">
+          <div class="debug-tabs">
+            <button type="button" id="debugTabLogs" class="debug-tab-btn debug-tab-btn--active">Logs</button>
+            <button type="button" id="debugTabState" class="debug-tab-btn">Live State</button>
+            <button type="button" id="debugTabDiagnostics" class="debug-tab-btn">Diagnostics</button>
+          </div>
+          
+          <div id="debugContentLogs" class="debug-tab-content">
+            <p class="debug-panel-tip">
+              <strong>Copy report</strong> bundles diagnostics, expanded session JSON, and the log. Use <strong>Copy JSON</strong> for a compact machine-readable snapshot.
+            </p>
+            <div class="debug-panel-actions">
+              <label class="toggle-row"><input id="debugVerbose" type="checkbox" /> Verbose</label>
+              <label class="toggle-row"><input id="debugReportIncludeSource" type="checkbox" /> Include source excerpt</label>
+              <label class="toggle-row">Level
+                <select id="debugLevelFilter">
+                  <option value="all">All</option>
+                  <option value="error">Error only</option>
+                  <option value="warn">Warn + Error</option>
+                  <option value="info">Info only</option>
+                </select>
+              </label>
+            </div>
+            <div class="debug-panel-actions">
+              <label class="toggle-row"><input id="debugAutoScroll" type="checkbox" checked /> Auto-scroll</label>
+              <label class="toggle-row">Search <input id="debugSearchInput" type="search" placeholder="Filter..." autocomplete="off" /></label>
+              <button type="button" id="debugClearBtn">Clear</button>
+              <button type="button" id="debugCopyReportBtn" class="debug-btn-primary">Copy Report</button>
+              <button type="button" id="debugCopyTriageBtn">Triage</button>
+              <button type="button" id="debugVerifyBtn" title="AI Debug: Dry-run save and verify output">Verify</button>
+              <button type="button" id="debugToggleLayersBtn" title="AI Debug: Toggle block offset overlays">Layers</button>
+            </div>
+            <pre id="debugLog" class="debug-log"></pre>
+          </div>
+
+          <div id="debugContentState" class="debug-tab-content debug-tab-content--hidden">
+            <div class="debug-panel-actions">
+              <button type="button" id="debugRefreshStateBtn">Refresh State</button>
+              <label class="toggle-row"><input id="debugAutoRefreshState" type="checkbox" /> Auto-refresh (2s)</label>
+            </div>
+            <div class="debug-state-grid">
+              <div class="debug-state-col">
+                <h4>Pending Changes</h4>
+                <div id="debugStatePending" class="debug-state-box"></div>
+              </div>
+              <div class="debug-state-col">
+                <h4>Active State</h4>
+                <div id="debugStateActive" class="debug-state-box"></div>
+              </div>
+            </div>
+            <pre id="debugStateJson" class="debug-log debug-log--small"></pre>
+          </div>
+
+          <div id="debugContentDiagnostics" class="debug-tab-content debug-tab-content--hidden">
+             <div id="debugDiagnosticsList" class="debug-diagnostics-list"></div>
+          </div>
+        </div>
+      </div>
+    </dialog>
+
+
+
+    <div class="app-body-container">
+      <main>
+      <div class="canvas-scroll">
+        <div id="canvas" class="canvas">
+          <svg id="lineLayer" class="line-layer">
+            <defs>
+              <filter id="lineGlow" x="-50%" y="-50%" width="200%" height="200%">
+                <feDropShadow dx="0" dy="0" stdDeviation="0.5" flood-color="#1f6feb" flood-opacity="0.4" />
+              </filter>
+            </defs>
+          </svg>
+          <div id="marquee" class="marquee" aria-hidden="true"></div>
+      </div>
+      </div> <!-- close canvas-scroll -->
+    </main>
+
+    <!-- MINIMAP (Moved to body end for absolute event safety) -->
+    <div id="minimap-container" class="minimap-container">
+      <div class="minimap-header" id="minimap-header">
+        <div class="minimap-title">Tree Navigator</div>
+        <button id="minimap-close-btn" class="minimap-close-btn" title="Close Minimap">&times;</button>
+      </div>
+      <div id="minimap-content" class="minimap-content">
+        <canvas id="minimap-canvas" class="minimap-canvas"></canvas>
+        <div id="minimap-viewport" class="minimap-viewport"></div>
+      </div>
+    </div>
+
+    <!-- Command Sidebar (Right Side Property Panel) -->
+    <aside id="property-sidebar" class="property-sidebar" aria-hidden="true">
+      <div id="sidebar-resizer" class="sidebar-resizer"></div>
+      <div class="sidebar-header">
+        <div class="sidebar-top-row">
+          <button id="sidebar-close-btn" class="sidebar-close-btn" title="Close Sidebar">&times;</button>
+        </div>
+        <h2 id="sidebar-focus-id">No Selection</h2>
+      </div>
+      
+      <div class="sidebar-content">
+        <section class="sidebar-section">
+          <h3>Identity</h3>
+          <div class="field-group">
+            <label for="sb-focus-name">Name (Localization)</label>
+            <input type="text" id="sb-focus-name" placeholder="Focus Name...">
+          </div>
+          <div class="field-group">
+            <label for="sb-focus-desc">Description (Localization)</label>
+            <textarea id="sb-focus-desc" placeholder="Focus Description..."></textarea>
+          </div>
+          <div class="field-group">
+            <label for="sb-focus-icon">Icon GFX</label>
+            <div class="icon-picker-row" style="display: flex; gap: 8px; align-items: center; margin-bottom: 8px;">
+              <input type="text" id="sb-focus-icon" placeholder="GFX_focus_..." style="flex: 1; margin: 0;">
+              <button type="button" id="selectFocusIconBtn" style="margin: 0; padding: 8px 12px; font-size: 12px; white-space: nowrap; width: auto; background: #21262d; border: 1px solid #30363d; color: #c9d1d9; border-radius: 6px; cursor: pointer; font-weight: 600;">Browse</button>
+              <button type="button" id="uploadFocusIconBtn" title="Upload your own image as this focus's icon (PNG/DDS → GFX_focus_…)" style="margin: 0; padding: 8px 12px; font-size: 12px; white-space: nowrap; width: auto; background: #21262d; border: 1px solid #30363d; color: #c9d1d9; border-radius: 6px; cursor: pointer; font-weight: 600;">Upload</button>
+              <input type="file" id="focusIconUploadInput" accept="image/*,.dds" style="display: none;">
+            </div>
+            <div id="sb-focus-icon-upload-status" style="display:none; font-size:11px; margin:0 0 6px; line-height:1.4;"></div>
+            <div style="display: flex; align-items: center; justify-content: center; background: #0d1117; border: 1px dashed #30363d; border-radius: 6px; padding: 6px; height: 60px; box-sizing: border-box; overflow: hidden;">
+              <img id="sb-icon-preview" src="" alt="Focus Icon" style="max-height: 100%; max-width: 100%; object-fit: contain; display: none;" data-hide-on-error="1">
+            </div>
+            <div id="sb-icon-note" style="display:none; font-size:11px; color:#e3b341; margin-top:5px; line-height:1.4;">⚠ No icon chosen — the game will use a generic default. Click <b>Browse</b> to pick one for a custom look.</div>
+          </div>
+          <div class="field-group">
+            <label for="sb-focus-cost">Days to finish</label>
+            <input type="number" id="sb-focus-cost" min="1" step="1">
+          </div>
+          <div class="field-group">
+            <button id="sb-open-file-btn" class="sidebar-add-btn">Open focus tree file...</button>
+          </div>
+        </section>
+
+        <section class="sidebar-section">
+          <div class="sb-section">
+          <div class="sb-section-title">Positioning</div>
+          <div class="sb-hint-text">Tip: You can also drag focuses to move them.</div>
+          
+          <div class="sb-field-row">
+            <label for="sb-focus-x">Grid X</label>
+            <input type="number" id="sb-focus-x" step="1">
+          </div>
+          <div class="sb-field-row">
+            <label for="sb-focus-y">Grid Y</label>
+            <input type="number" id="sb-focus-y" step="1">
+          </div>
+          <div class="field-group" id="sb-focus-relative-group" style="display: none; margin-top: 6px;">
+            <label for="sb-focus-relative">Relative to (focus id)</label>
+            <input type="text" id="sb-focus-relative" placeholder="(blank = absolute position)" list="focusIdDatalist" disabled />
+            <datalist id="focusIdDatalist"></datalist>
+            <div class="sb-hint-text" id="sb-relative-hint" style="display:none;">Grid X/Y above are now <b>offsets</b> from the anchor focus.</div>
+          </div>
+        </div>
+</section>
+
+        <section class="sidebar-section">
+          <h3>Structure</h3>
+          <div class="field-group">
+            <label>Prerequisites</label>
+            <div id="sb-prereq-list" class="sidebar-list"></div>
+            <button id="sb-add-prereq" class="sidebar-add-btn">+ Add Prerequisite</button>
+          </div>
+          <div class="field-group">
+            <label>Mutually Exclusive</label>
+            <div id="sb-mutex-list" class="sidebar-list"></div>
+            <button id="sb-add-mutex" class="sidebar-add-btn">+ Add Conflict</button>
+          </div>
+        </section>
+
+        <section class="sidebar-section">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <h3 style="margin: 0;">Reward Lab</h3>
+            <button id="genesis-toggle-btn" 
+              style="font-size: 10px; background: #238636; border: 1px solid #2ea043; color: white; padding: 4px 8px; border-radius: 4px; cursor: pointer; transition: all 0.2s; font-weight: bold;">
+              Genesis: ON
+            </button>
+          </div>
+          <div id="sb-reward-list" class="sidebar-list effects-list"></div>
+          
+          <div class="add-effect-controls">
+            <button id="sb-add-effect-btn" class="sidebar-add-btn">+ Add Manual Effect</button>
+          </div>
+
+          <div class="ai-logic-lab" style="margin-top: 15px; border-top: 1px solid #30363d; padding-top: 15px;">
+            <h4 style="color: #58a6ff; font-size: 11px; text-transform: uppercase; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">AI Logic Lab <span id="aiLogicHelpBtn" style="display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; border-radius: 50%; background: #30363d; color: #8b949e; font-size: 10px; cursor: pointer; font-weight: bold;" title="How to get an API Key?">?</span></h4>
+            <textarea id="ai-logic-input" placeholder="Describe the focus reward (e.g. 'Give Germany +100 XP if at war with Poland')" 
+              style="width: 100%; height: 80px; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; color: #f1f5fb; padding: 10px; font-size: 13px; resize: vertical;"></textarea>
+            <button id="ai-logic-generate-btn" class="sidebar-add-btn" 
+              style="margin-top: 8px; width: 100%; background: linear-gradient(135deg, #1f6feb 0%, #388bfd 100%); color: white; font-weight: bold; border: none;">
+              Generate Logic
+            </button>
+            <div id="ai-logic-status" style="font-size: 11px; color: #8b949e; margin-top: 5px; display: none;">AI is thinking...</div>
+            
+            <div id="ai-logic-preview-container" style="display: none; margin-top: 10px;">
+              <div style="font-size: 10px; color: #8b949e; text-transform: uppercase; margin-bottom: 4px;">Syntax Preview</div>
+              <pre id="ai-logic-preview" style="background: #010409; border: 1px solid #30363d; color: #79c0ff; padding: 10px; border-radius: 6px; font-size: 11px; margin: 0; white-space: pre-wrap; word-break: break-all;"></pre>
+            </div>
+          </div>
+          
+          <!-- Modern Effect Picker (initially hidden) -->
+          <div id="sb-effect-picker" class="sb-effect-picker sb-hidden">
+            <input type="text" id="sb-effect-search" placeholder="Search effects...">
+            <div id="sb-effect-picker-list" class="sb-effect-picker-list">
+              <!-- Dynamically populated -->
+            </div>
+            <button id="sb-effect-picker-close" class="sb-btn">Cancel</button>
+          </div>
+        </section>
+
+        <section class="sidebar-section">
+          <details id="sb-advanced-details">
+            <summary style="cursor: pointer; font-weight: 700; color: #8b949e; padding: 4px 0; user-select: none;">⚙ Advanced — raw HOI4 script (optional)</summary>
+            <div class="sb-hint-text" style="margin: 6px 0 10px;">For power users. Leave blank and the focus works fine — use the Reward Lab above for effects without writing code.</div>
+            <div class="field-group">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <label style="margin: 0;" for="sb-focus-available">Available — conditions required to pick this focus</label>
+                <button type="button" class="ai-trigger-gen-btn" data-target="sb-focus-available" data-type="available" style="font-size: 10px; background: #5d3b8e; border: 1px solid #8c60ce; color: #fff; padding: 2px 6px; border-radius: 4px; cursor: pointer; font-weight: 600; outline: none;">✨ AI</button>
+              </div>
+              <textarea id="sb-focus-available" placeholder="e.g.&#10;has_war = no&#10;has_completed_focus = some_focus" style="min-height: 60px; font-family: ui-monospace, monospace; font-size: 12px;"></textarea>
+              <div class="genesis-preview" id="sb-focus-available-preview" style="display:none;"></div>
+            </div>
+            <div class="field-group">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <label style="margin: 0;" for="sb-focus-allowbranch">Allow branch — hide this whole branch unless conditions are met</label>
+                <button type="button" class="ai-trigger-gen-btn" data-target="sb-focus-allowbranch" data-type="allow_branch" style="font-size: 10px; background: #5d3b8e; border: 1px solid #8c60ce; color: #fff; padding: 2px 6px; border-radius: 4px; cursor: pointer; font-weight: 600; outline: none;">✨ AI</button>
+              </div>
+              <div class="sb-hint-text" style="margin: 0 0 6px;">The whole branch stays hidden in the tree until met — e.g. only show a DLC or ideology path. Leave blank to always show.</div>
+              <textarea id="sb-focus-allowbranch" placeholder="e.g.&#10;has_dlc = &quot;Man the Guns&quot;&#10;has_government = fascism" style="min-height: 50px; font-family: ui-monospace, monospace; font-size: 12px;"></textarea>
+              <div class="genesis-preview" id="sb-focus-allowbranch-preview" style="display:none;"></div>
+            </div>
+            <div class="field-group">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <label style="margin: 0;" for="sb-focus-aiwilldo">AI Will Do — how strongly the AI prioritizes this focus</label>
+                <button type="button" class="ai-trigger-gen-btn" data-target="sb-focus-aiwilldo" data-type="ai_will_do" style="font-size: 10px; background: #5d3b8e; border: 1px solid #8c60ce; color: #fff; padding: 2px 6px; border-radius: 4px; cursor: pointer; font-weight: 600; outline: none;">✨ AI</button>
+              </div>
+              <textarea id="sb-focus-aiwilldo" placeholder="e.g.&#10;factor = 1&#10;modifier = {&#10;  factor = 2&#10;  has_war = yes&#10;}" style="min-height: 50px; font-family: ui-monospace, monospace; font-size: 12px;"></textarea>
+            </div>
+            <div class="field-group">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <label style="margin: 0;" for="sb-focus-bypass">Bypass — if met, the focus is auto-completed/skipped</label>
+                <button type="button" class="ai-trigger-gen-btn" data-target="sb-focus-bypass" data-type="bypass" style="font-size: 10px; background: #5d3b8e; border: 1px solid #8c60ce; color: #fff; padding: 2px 6px; border-radius: 4px; cursor: pointer; font-weight: 600; outline: none;">✨ AI</button>
+              </div>
+              <textarea id="sb-focus-bypass" placeholder="e.g.&#10;has_completed_focus = some_other_focus" style="min-height: 44px; font-family: ui-monospace, monospace; font-size: 12px;"></textarea>
+              <div class="genesis-preview" id="sb-focus-bypass-preview" style="display:none;"></div>
+            </div>
+            <div class="sb-field-row">
+              <label for="sb-focus-cancel">Cancel if invalid</label>
+              <select id="sb-focus-cancel">
+                <option value="">(default)</option>
+                <option value="yes">yes</option>
+                <option value="no">no</option>
+              </select>
+            </div>
+            <div class="sb-field-row">
+              <label for="sb-focus-continue">Continue if invalid</label>
+              <select id="sb-focus-continue">
+                <option value="">(default)</option>
+                <option value="yes">yes</option>
+                <option value="no">no</option>
+              </select>
+            </div>
+            <div class="sb-field-row">
+              <label for="sb-focus-capitulated" title="Can this focus still be taken while the country has capitulated? Leave at (default) and HOI4 treats it as no.">Available if capitulated</label>
+              <select id="sb-focus-capitulated" title="Can this focus still be taken while the country has capitulated? Leave at (default) and HOI4 treats it as no.">
+                <option value="">(default)</option>
+                <option value="yes">yes</option>
+                <option value="no">no</option>
+              </select>
+            </div>
+            <div class="field-group">
+              <label for="sb-focus-warwith">Will lead to war with <span style="font-weight:400;color:#8b949e;">(a country tag — flags this focus as a war declaration for the AI/UI, e.g. <code>USA</code>)</span></label>
+              <input type="text" id="sb-focus-warwith" placeholder="e.g. USA" style="font-family: ui-monospace, monospace; font-size: 12px; text-transform: uppercase;" />
+            </div>
+            <div class="field-group">
+              <label for="sb-focus-selecteffect">Select effect — effects that run when this focus is STARTED (not on completion)</label>
+              <textarea id="sb-focus-selecteffect" placeholder="e.g.&#10;country_event = { id = my_event.1 days = 30 }" style="min-height: 50px; font-family: ui-monospace, monospace; font-size: 12px;"></textarea>
+              <div class="genesis-preview" id="sb-focus-selecteffect-preview" style="display:none;"></div>
+            </div>
+          </details>
+        </section>
+      </div>
+      
+      <div class="sidebar-footer">
+        <!-- Update Focus button removed for live updates -->
+      </div>
+    </aside>
+
+    <!-- TIME MACHINE SIMULATOR CONTAINERS -->
+    <div id="simHud" class="sim-hud sim-hidden">
+      <div class="sim-hud-logo">SIMULATION</div>
+      <div class="sim-hud-controls">
+        <button id="simPlayBtn" class="sim-hud-btn" title="Start/Pause (Space)">▶</button>
+        <button id="simStepBtn" class="sim-hud-btn" title="Step 1 Day (D)">Step</button>
+        <button id="simSpeedBtn" class="sim-hud-btn" title="Toggle Speed">1x</button>
+        <button id="simRunPathBtn" class="sim-hud-btn sim-hud-btn--accent" title="Auto-complete every reachable focus in prerequisite order and project the whole timeline">⏭ Run Full Path</button>
+        <button id="simResetBtn" class="sim-hud-btn" title="Reset the simulation back to 1 Jan 1936">↺ Reset</button>
+      </div>
+      <div class="sim-hud-scrubber-container">
+        <span class="sim-scrubber-label">Timeline:</span>
+        <input type="range" id="simScrubber" min="0" max="0" value="0" step="1" title="Drag to rewind/fast-forward states" />
+        <span id="simScrubberLabel">0 / 0</span>
+      </div>
+      <div id="simDateDisplay" class="sim-date-display">1 Jan, 1936</div>
+    </div>
+
+    <aside id="simLedger" class="sim-ledger sim-hidden">
+      <div class="sim-ledger-header">
+        <div style="font-weight: 700; font-size: 15px; color: #58a6ff; letter-spacing: 0.5px;">STATE LEDGER</div>
+        <div id="simCountryFlag" class="sim-country-flag">GER</div>
+      </div>
+      
+      <div class="sim-ledger-content">
+        <!-- Honest scope note: only focus-tree effects are projected. -->
+        <div class="sim-disclaimer" id="simDisclaimer">
+          <strong>Focus-tree projection only.</strong> Models the effects inside your focuses' <code>completion_reward</code> blocks (political power, stability, war support, command power, manpower, research slots, experience, national spirits, flags). It does <strong>not</strong> simulate decisions, events, war, the economy, or other game systems. Daily political power uses HOI4's base <strong>+2/day</strong> (Regular) scaled by stability and any spirit modifiers your focuses grant — a guide, not the exact in-game value.
+        </div>
+
+        <!-- Current Focus Info Widget -->
+        <div class="sim-ledger-section" id="simCurrentFocusSection">
+          <h4>Current Research</h4>
+          <div id="simCurrentFocusDisplay" class="sim-current-focus-card">
+            <div class="sim-empty-text" style="color: #58a6ff; font-weight: 500; font-style: normal; display: flex; flex-direction: column; gap: 6px;">
+              <span>No focus selected for simulation.</span>
+              <span style="font-size: 10px; color: #8b949e;">👉 Click any glowing blue focus node in the tree to start researching it.</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Widget Stats Grid -->
+        <div class="sim-stats-grid">
+          <div class="sim-stat-card">
+            <span class="sim-stat-label">Political Power</span>
+            <div class="sim-stat-val-container">
+              <span id="simValPP" class="sim-stat-val">150</span>
+              <span id="simDeltaPP" class="sim-stat-delta sim-delta-pos">+2.0/d</span>
+            </div>
+          </div>
+          <div class="sim-stat-card">
+            <span class="sim-stat-label">Stability</span>
+            <div class="sim-stat-val-container">
+              <span id="simValStability" class="sim-stat-val">50%</span>
+            </div>
+          </div>
+          <div class="sim-stat-card">
+            <span class="sim-stat-label">War Support</span>
+            <div class="sim-stat-val-container">
+              <span id="simValWarSupport" class="sim-stat-val">50%</span>
+            </div>
+          </div>
+          <div class="sim-stat-card">
+            <span class="sim-stat-label">Command Power</span>
+            <div class="sim-stat-val-container">
+              <span id="simValCP" class="sim-stat-val">0</span>
+            </div>
+          </div>
+          <div class="sim-stat-card">
+            <span class="sim-stat-label">Manpower</span>
+            <div class="sim-stat-val-container">
+              <span id="simValManpower" class="sim-stat-val">0</span>
+            </div>
+          </div>
+          <div class="sim-stat-card">
+            <span class="sim-stat-label">Research Slots</span>
+            <div class="sim-stat-val-container">
+              <span id="simValResearchSlots" class="sim-stat-val">3</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Experience Row -->
+        <div class="sim-xp-row">
+          <div class="sim-xp-badge xp-army" title="Army XP"><span id="simValArmyXp">0</span></div>
+          <div class="sim-xp-badge xp-navy" title="Navy XP"><span id="simValNavyXp">0</span></div>
+          <div class="sim-xp-badge xp-air" title="Air XP"><span id="simValAirXp">0</span></div>
+        </div>
+
+        <!-- Spirits Section -->
+        <div class="sim-ledger-section">
+          <h4>Active National Spirits</h4>
+          <div id="simSpiritsList" class="sim-spirits-list">
+            <div class="sim-empty-text">No active spirits</div>
+          </div>
+        </div>
+
+        <!-- Flags Section -->
+        <div class="sim-ledger-section">
+          <h4>Active Country Flags</h4>
+          <div id="simFlagsList" class="sim-flags-list">
+            <div class="sim-empty-text">No active flags</div>
+          </div>
+        </div>
+
+        <!-- Projected full-path timeline (populated by Run Full Path) -->
+        <div class="sim-ledger-section" id="simTimelineSection" style="display:none;">
+          <h4>Projected Path</h4>
+          <div id="simTimelineList" class="sim-timeline-list"></div>
+        </div>
+
+        <!-- Effects that fire in-game but aren't projected here -->
+        <div class="sim-ledger-section">
+          <h4>Applies In-Game — Not Projected Here</h4>
+          <div id="simNotSimulatedList" class="sim-notsim-list">
+            <div class="sim-empty-text">Nothing skipped yet — completed focuses only had projectable effects.</div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- AI Triage Box inside the ledger sidebar -->
+      <div class="sim-ai-triage" style="display: flex; flex-direction: column; gap: 8px;">
+        <div class="sim-ai-triage-title">Gemini Co-Pilot Analysis</div>
+        <div id="simAiReport" class="sim-ai-triage-body">No focus selected. Click a researchable focus in the tree.</div>
+        <button id="simAiAnalyzeBtn" class="sim-hud-btn" style="display: none; background: linear-gradient(135deg, #1f6feb 0%, #388bfd 100%) !important; color: white !important; font-weight: bold !important; border: none !important; width: 100%; box-sizing: border-box;">Analyze with Gemini</button>
+      </div>
+    </aside>
+
+    <!-- Event Popup Overlay -->
+    <div id="simEventOverlay" class="sim-event-overlay sim-hidden">
+      <div class="sim-event-window">
+        <div class="sim-event-photo-container">
+          <div class="sim-event-photo-title" id="simEventHeader">EVENT</div>
+        </div>
+        <div class="sim-event-body">
+          <div class="sim-event-text-col">
+            <h2 id="simEventTitle">An Event Occurs</h2>
+            <div id="simEventDesc">Something significant has happened.</div>
+          </div>
+          <div class="sim-event-options-col" id="simEventOptions">
+            <!-- Dynamically populated buttons -->
+          </div>
+        </div>
+      </div>
+    </div>
+    </div>
+
+    <div id="toast" class="toast" aria-live="polite"></div>
+
+
+    <div id="effectsMenu" class="effects-menu effects-menu--hidden" aria-hidden="true">
+      <div id="effectsMenuTitle" class="effects-menu-title">Focus actions</div>
+      <button type="button" id="menuOpenEffectsBtn" class="effects-menu-btn effects-menu-btn--submenu">Effects ▶</button>
+      <button type="button" id="menuOpenDetailsBtn" class="effects-menu-btn effects-menu-btn--submenu">Details ▶</button>
+      <button type="button" id="menuPrerequisiteBtn" class="effects-menu-btn effects-menu-btn--prereq">Requires earlier focus…</button>
+      <button type="button" id="menuPrerequisiteRemoveBtn" class="effects-menu-btn effects-menu-btn--prereq" hidden>
+        Remove requirement…
+      </button>
+      <button type="button" id="menuMutualExclusiveBtn" class="effects-menu-btn effects-menu-btn--mutex">Mutually Exclusive Link</button>
+
+      <div id="effectsSubmenu" class="effects-submenu effects-submenu--hidden" aria-hidden="true">
+        <div class="effects-menu-title">Effects</div>
+        <label class="effects-search-wrap" for="effectsSearchInput">
+          <span class="effects-search-sr">Search effects</span>
+          <input
+            id="effectsSearchInput"
+            type="search"
+            class="effects-search-input"
+            placeholder="Search (e.g. military, flag, research)..."
+            autocomplete="off"
+            spellcheck="false"
+          />
+        </label>
+        <div class="effects-submenu-scroll">
+          <button type="button" id="menuNationalMoodBtn" class="effects-menu-btn effects-menu-btn--submenu">National Mood ▶</button>
+          <button type="button" id="menuAddNationalResourcesBtn" class="effects-menu-btn effects-menu-btn--submenu">National Resources ▶</button>
+          <button type="button" id="menuResearchDoctrineBtn" class="effects-menu-btn effects-menu-btn--submenu">Research & Doctrine ▶</button>
+          <button type="button" id="menuAddIdeaBtn" class="effects-menu-btn effects-menu-btn--submenu">Add National Spirit ▶</button>
+          <button type="button" id="menuAddBuildingBtn" class="effects-menu-btn effects-menu-btn--submenu">Add Buildings ▶</button>
+          <button type="button" id="menuOpenDiplomacyBtn" class="effects-menu-btn effects-menu-btn--submenu">Diplomacy &amp; Claims ▶</button>
+        <button type="button" id="effectsCustomBtn" class="effects-menu-btn effects-menu-btn--custom" data-effects-manual-open="1">
+          Open focus tree file...
+        </button>
+        </div>
+      </div>
+
+      <div id="ideaEffectsSubmenu" class="effects-submenu effects-submenu--hidden" aria-hidden="true">
+        <div class="effects-menu-title">National spirits</div>
+        <button type="button" id="menuMakeNationalSpiritBtn" class="effects-menu-btn">Make National Spirit…</button>
+        <button type="button" id="menuEditNationalSpiritBtn" class="effects-menu-btn">Edit national spirit…</button>
+        <button type="button" id="menuAddIdeaOpenPickerBtn" class="effects-menu-btn">Add National Spirit...</button>
+        <button type="button" id="menuAddTimedIdeaOpenPickerBtn" class="effects-menu-btn">Add Timed National Spirit...</button>
+        <div id="menuIdeaRemoveList" class="effects-submenu-scroll"></div>
+      </div>
+
+      <div id="buildingEffectsSubmenu" class="effects-submenu effects-submenu--hidden" aria-hidden="true">
+        <div class="effects-menu-title">Buildings</div>
+        <button type="button" class="effects-menu-btn" data-effect-key="add_extra_state_shared_building_slots">Add State Building Slots...</button>
+        <button type="button" id="menuAddBuildingOpenPickerBtn" class="effects-menu-btn">Add Building...</button>
+        <button type="button" id="menuAddOffmapBuildingOpenPickerBtn" class="effects-menu-btn">Add Off-map Building...</button>
+        <div id="menuBuildingRemoveList" class="effects-submenu-scroll"></div>
+      </div>
+
+      <div id="nationalResourcesSubmenu" class="effects-submenu effects-submenu--hidden" aria-hidden="true">
+        <div class="effects-menu-title">National Resources</div>
+        <button type="button" class="effects-menu-btn" data-effect-key="add_political_power">Add Political Power...</button>
+        <button type="button" class="effects-menu-btn" data-effect-key="add_command_power">Add Command Power...</button>
+        <button type="button" class="effects-menu-btn" data-effect-key="add_manpower">Add Manpower...</button>
+        <button type="button" class="effects-menu-btn" data-effect-key="add_fuel">Add Fuel...</button>
+        <button type="button" class="effects-menu-btn" data-effect-key="add_army_experience">Add Army XP...</button>
+        <button type="button" class="effects-menu-btn" data-effect-key="add_navy_experience">Add Navy XP...</button>
+        <button type="button" class="effects-menu-btn" data-effect-key="add_air_experience">Add Air XP...</button>
+        <!-- <button type="button" class="effects-menu-btn" data-effect-key="add_equipment_to_stockpile" hidden>Add Equipment...</button> -->
+      </div>
+
+      <div id="nationalMoodSubmenu" class="effects-submenu effects-submenu--hidden" aria-hidden="true">
+        <div class="effects-menu-title">National Mood</div>
+        <button type="button" class="effects-menu-btn" data-effect-key="add_stability">Add Stability...</button>
+        <button type="button" class="effects-menu-btn" data-effect-key="set_stability">Set Stability...</button>
+        <button type="button" class="effects-menu-btn" data-effect-key="add_war_support">Add War Support...</button>
+        <button type="button" class="effects-menu-btn" data-effect-key="set_war_support">Set War Support...</button>
+      </div>
+
+      <div id="tensionPoliticsSubmenu" class="effects-submenu effects-submenu--hidden" aria-hidden="true">
+        <div class="effects-menu-title">Tension &amp; politics</div>
+        <button type="button" class="effects-menu-btn" data-effect-key="add_autonomy_ratio">Add Autonomy Ratio...</button>
+        <button type="button" class="effects-menu-btn" data-effect-key="add_autonomy_score">Add Autonomy Score...</button>
+        <button type="button" class="effects-menu-btn" data-effect-key="add_legitimacy">Add Legitimacy...</button>
+        <button type="button" class="effects-menu-btn" data-effect-key="add_popularity">Add Popularity...</button>
+        <button type="button" class="effects-menu-btn" data-effect-key="set_politics">Set Politics (Party)...</button>
+      </div>
+
+      <div id="researchDoctrineSubmenu" class="effects-submenu effects-submenu--hidden" aria-hidden="true">
+        <div class="effects-menu-title">Research & Doctrine</div>
+        <button type="button" class="effects-menu-btn" data-effect-key="add_research_slot">Add Research Slot...</button>
+        <button type="button" class="effects-menu-btn" data-effect-key="add_to_tech_sharing_group">Add To Tech Sharing Group...</button>
+        <button type="button" class="effects-menu-btn" data-effect-key="add_research_bonus">Add Research Bonus...</button>
+        <button type="button" id="menuAddAnotherResearchBonusBtn" class="effects-menu-btn">Add another research bonus...</button>
+        <div id="menuResearchBonusRemoveList" class="effects-submenu-scroll"></div>
+        <button type="button" class="effects-menu-btn" data-effect-key="add_doctrine_cost_reduction">Add Doctrine Cost Reduction...</button>
+        <div id="menuDoctrineRemoveList" class="effects-submenu-scroll"></div>
+      </div>
+
+
+
+      <div id="detailsSubmenu" class="effects-submenu effects-submenu--hidden" aria-hidden="true">
+        <div class="effects-menu-title">Details</div>
+        <button type="button" id="menuOpenDetailsDialogBtn" class="effects-menu-btn">Open Details...</button>
+      </div>
+      <div id="diplomacySubmenu" class="effects-submenu effects-submenu--hidden" aria-hidden="true">
+        <div class="effects-menu-title">Diplomacy & Claims</div>
+        <div class="effects-submenu-scroll">
+          <button type="button" class="effects-menu-btn" data-effect-key="add_state_claim">Add Claim on State...</button>
+          <button type="button" class="effects-menu-btn" data-effect-key="add_state_core">Add Core on State...</button>
+          <button type="button" class="effects-menu-btn" data-effect-key="create_wargoal">Create Wargoal...</button>
+          <button type="button" class="effects-menu-btn" data-effect-key="white_peace">White Peace...</button>
+          <button type="button" class="effects-menu-btn" data-effect-key="puppet">Puppet Country...</button>
+          <button type="button" class="effects-menu-btn" data-effect-key="annex_country">Annex Country...</button>
+          <button type="button" class="effects-menu-btn" data-effect-key="transfer_state">Transfer State...</button>
+          <button type="button" class="effects-menu-btn" data-effect-key="set_capital">Set Capital...</button>
+          <button type="button" class="effects-menu-btn" data-effect-key="declare_war_on">Declare War On...</button>
+          <button type="button" class="effects-menu-btn" data-effect-key="guarantee">Guarantee Country...</button>
+          <button type="button" class="effects-menu-btn" data-effect-key="give_military_access">Give Military Access...</button>
+          <button type="button" class="effects-menu-btn" data-effect-key="add_resource">Add Resources to State...</button>
+          <div id="menuDiplomacyRemoveList" class="effects-menu-section-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <dialog id="effectAmountDialog" class="effect-amount-dialog">
+      <form id="effectAmountForm" method="dialog" class="effect-amount-form">
+        <h3 id="effectAmountTitle">Add effect</h3>
+        <p id="effectAmountFocusLabel" class="effect-amount-focus"></p>
+        <div id="effectAmountPairModeRow" class="effect-amount-row effect-amount-pair-mode-row effect-amount-row--hidden">
+          <button type="button" id="effectAmountPairModeBtn" class="effect-amount-pair-mode-btn"></button>
+        </div>
+        <div id="effectAmountPresetDescBlock" class="effect-amount-idea-block effect-amount-row--hidden">
+          <p id="effectAmountPresetDesc" class="effect-amount-idea-hint" role="note"></p>
+        </div>
+        <div
+          id="effectAmountIdeaHintBlock"
+          class="effect-amount-idea-block effect-amount-row--hidden"
+        >
+          <p id="effectAmountIdeaHint" class="effect-amount-idea-hint" role="note"></p>
+          <p id="effectAmountIdeaAddWarn" class="effect-amount-idea-warn" role="note"></p>
+        </div>
+        <label id="effectAmountValueLabel" for="effectAmountInput">Amount</label>
+        <input id="effectAmountInput" type="number" />
+        <div id="effectAmountModRootRow" class="effect-amount-row effect-amount-row--hidden">
+          <label id="effectAmountModRootLabel" for="effectAmountModRootInput"
+            >Source mod folder (absolute path)</label>
+          <input
+            id="effectAmountModRootInput"
+            class="effect-amount-mod-path"
+            type="text"
+            dir="ltr"
+            autocomplete="off"
+            autocapitalize="off"
+            spellcheck="false"
+            placeholder="C:\Program Files (x86)\Steam\steamapps\workshop\content\394360\…"
+          />
+        </div>
+        <div class="effect-amount-actions">
+          <button type="button" id="effectAmountCancelBtn">Cancel</button>
+          <button type="submit" id="effectAmountApplyBtn">Apply</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="techBonusWizardDialog" class="effect-amount-dialog tech-bonus-wizard">
+      <form id="techBonusWizardForm" method="dialog" class="effect-amount-form">
+        <h3>Add tech bonus</h3>
+        <p id="techBonusWizardFocusLabel" class="effect-amount-focus"></p>
+        <label for="techBonusWizardSearch">Technology category</label>
+        <input id="techBonusWizardSearch" type="search" placeholder="Filter categories…" autocomplete="off" />
+        <div id="techBonusWizardList" class="picker-list" role="listbox" aria-label="Technology categories"></div>
+        <label for="techBonusWizardBonusInput">Research speed bonus</label>
+        <input id="techBonusWizardBonusInput" type="text" inputmode="decimal" placeholder="0.15 or 15%" />
+        <p class="effect-amount-focus">Uses <code>uses = 1</code>. The <code>name</code> key is generated from the focus id and category.</p>
+        <div class="effect-amount-actions">
+          <button type="button" id="techBonusWizardCancelBtn">Cancel</button>
+          <button type="button" id="techBonusWizardAddBtn">Add</button>
+          <button type="submit" id="techBonusWizardApplyBtn">Apply</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="effectListWizardDialog" class="effect-amount-dialog tech-bonus-wizard">
+      <form id="effectListWizardForm" method="dialog" class="effect-amount-form">
+        <h3 id="effectListWizardTitle">Select effect option</h3>
+        <p id="effectListWizardFocusLabel" class="effect-amount-focus"></p>
+        <div class="effect-list-state-grid">
+          <div id="effectListWizardMainCol" class="effect-list-state-picker">
+            <label id="effectListWizardSearchLabel" for="effectListWizardSearch">Option</label>
+            <input id="effectListWizardSearch" type="search" placeholder="Filter options…" autocomplete="off" />
+            <div id="effectListWizardList" class="picker-list" role="listbox" aria-label="Effect options"></div>
+          </div>
+
+          <div id="effectListWizardStateCol" class="effect-list-state-picker effect-amount-row--hidden">
+            <label for="effectListWizardStateSearch">State</label>
+            <input id="effectListWizardStateSearch" type="search" placeholder="Filter states…" autocomplete="off" />
+            <div id="effectListWizardStateList" class="picker-list" role="listbox" aria-label="States list"></div>
+          </div>
+
+          <div id="effectListWizardStateInfoPanel" class="effect-list-state-panel effect-amount-row--hidden">
+            <h4 id="effectListWizardStateInfoTitle" class="effect-list-state-panel-title">State details</h4>
+            <p id="effectListWizardStateInfoMeta" class="effect-list-state-panel-meta">Select a state to preview buildings and caps.</p>
+            <p id="effectListWizardStateInfoSlots" class="effect-list-state-panel-slots">Slots: --/--</p>
+            <div id="effectListWizardStateInfoCards" class="effect-list-state-panel-cards"></div>
+          </div>
+        </div>
+        <div id="effectListWizardBuildingTypeRow" class="effect-amount-row effect-amount-row--hidden">
+          <label for="effectListWizardBuildingTypeSelect">Building type</label>
+          <select id="effectListWizardBuildingTypeSelect"></select>
+        </div>
+
+        <div id="effectListWizardAmountRow" class="effect-amount-row">
+          <label id="effectListWizardAmountLabel" for="effectListWizardAmountInput">Amount</label>
+          <input id="effectListWizardAmountInput" type="text" inputmode="decimal" />
+        </div>
+        <div id="effectListWizardCustomDirRow" class="effect-amount-row effect-amount-row--hidden">
+          <label for="effectListWizardCustomDirInput">Optional: scan another folder for flag files</label>
+          <input
+            id="effectListWizardCustomDirInput"
+            type="text"
+            class="effect-amount-mod-path"
+            placeholder="Absolute path to mod root or gfx/flags (must be under mod / workshop / game install)"
+            autocomplete="off"
+            spellcheck="false"
+            autocapitalize="off"
+            dir="ltr"
+          />
+          <button type="button" id="effectListWizardCustomDirLoadBtn" class="effects-menu-btn effects-menu-btn--narrow">
+            Load from path
+          </button>
+        </div>
+        <div id="effectListWizardImportRow" class="effect-amount-row effect-amount-row--hidden">
+          <label for="effectListWizardImportStemInput">Import custom flag into active mod (gfx/flags)</label>
+          <input
+            id="effectListWizardImportStemInput"
+            type="text"
+            class="effect-amount-mod-path"
+            placeholder="Stem (same as set_cosmetic_tag, e.g. MY_TAG)"
+            autocomplete="off"
+            spellcheck="false"
+            autocapitalize="off"
+            dir="ltr"
+          />
+          <p id="effectListWizardImportPathLabel" class="effects-menu-hint">No .tga file picked yet.</p>
+          <div class="effect-list-wizard-import-actions">
+            <button type="button" id="effectListWizardImportPickBtn" class="effects-menu-btn effects-menu-btn--narrow">
+              Pick .tga…
+            </button>
+          </div>
+          <details class="effects-menu-details">
+            <summary class="effects-menu-details-summary">Flag import details (TGA sizes, PNG, what Apply does)</summary>
+            <p class="effects-menu-hint">
+              Desktop app only for file picker. Source must be a .tga file (HOI4 expects TGA flags). If you only have PNG or
+              JPEG, convert to uncompressed 32-bit TGA with an online converter or image editor first. After you pick a .tga,
+              the stem list greys out until you cancel. Enter the stem below and click Apply: the app writes uncompressed
+              32-bit .tga files at main, medium, and small sizes and queues <code>set_cosmetic_tag</code>. Stretched to exact
+              sizes (quality loss is normal). Removes any same-stem .png in those folders. Overwrites same-stem .tga if
+              present.
+            </p>
+          </details>
+        </div>
+        <p id="effectListWizardHint" class="effect-amount-focus"></p>
+        <div class="effect-amount-actions">
+          <button type="button" id="effectListWizardCancelBtn">Cancel</button>
+          <button type="button" id="effectListWizardAddBtn">Add</button>
+          <button type="submit" id="effectListWizardApplyBtn">Apply</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="ideaPickerDialog" class="effect-amount-dialog tech-bonus-wizard">
+      <form id="ideaPickerForm" method="dialog" class="effect-amount-form">
+        <h3 id="ideaPickerTitle">Add National Spirit</h3>
+        <p id="ideaPickerFocusLabel" class="effect-amount-focus"></p>
+        <label for="ideaPickerSearch">Search national spirits</label>
+        <input id="ideaPickerSearch" type="search" placeholder="Search by spirit ID..." autocomplete="off" />
+        <div id="ideaPickerList" class="picker-list" role="listbox" aria-label="National spirits"></div>
+        <p id="ideaPickerPreview" class="effect-amount-focus"></p>
+        <label for="ideaPickerSourcePath">Source mod folder (absolute path, optional)</label>
+        <input
+          id="ideaPickerSourcePath"
+          type="text"
+          dir="ltr"
+          autocomplete="off"
+          autocapitalize="off"
+          spellcheck="false"
+          placeholder="C:\Program Files (x86)\Steam\steamapps\workshop\content\394360\1234567890"
+        />
+        <div class="effect-amount-actions">
+          <button type="button" id="ideaPickerScanBtn">Scan Path</button>
+        </div>
+        <label>
+          <input id="ideaPickerImportToggle" type="checkbox" />
+          Import national spirit into my mod (definition + localization + icon when found)
+        </label>
+        <div id="ideaPickerDaysRow" class="effect-amount-row effect-amount-row--hidden">
+          <label for="ideaPickerDaysInput">Duration (days)</label>
+          <input id="ideaPickerDaysInput" type="number" min="1" step="1" inputmode="numeric" value="180" />
+        </div>
+        <p id="ideaPickerHint" class="effect-amount-focus"></p>
+        <div class="effect-amount-actions">
+          <button type="button" id="ideaPickerEditBtn" hidden>Edit in Spirit Maker…</button>
+          <button type="button" id="ideaPickerCancelBtn">Cancel</button>
+          <button type="button" id="ideaPickerAddBtn">Add</button>
+          <button type="submit" id="ideaPickerApplyBtn">Apply</button>
+        </div>
+      </form>
+    </dialog>
+
+
+    <dialog id="detailsDialog" class="effect-amount-dialog">
+      <form id="detailsForm" method="dialog" class="effect-amount-form">
+        <h3>Focus Details</h3>
+        <p id="detailsFocusLabel" class="effect-amount-focus"></p>
+        <label for="detailsNameInput">Focus Name</label>
+        <input id="detailsNameInput" type="text" />
+        <label for="detailsDescInput">Focus Description</label>
+        <textarea id="detailsDescInput" rows="5" autocomplete="off"></textarea>
+        <label for="detailsIconKeyInput">Icon GFX Key</label>
+        <input id="detailsIconKeyInput" type="text" placeholder="GFX_focus_custom_icon" />
+        <div class="effect-amount-actions">
+          <button type="button" id="detailsImportDdsBtn">Import DDS...</button>
+        </div>
+        <p id="detailsLocPathLabel" class="effect-amount-focus"></p>
+        <div class="effect-amount-actions">
+          <button type="button" id="detailsCancelBtn">Cancel</button>
+          <button type="submit" id="detailsApplyBtn">Apply</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="createFocusDialog" class="effect-amount-dialog">
+      <form id="createFocusForm" method="dialog" class="effect-amount-form">
+        <h3>Create New Focus</h3>
+        <label for="createFocusIdInput">Focus ID</label>
+        <input id="createFocusIdInput" type="text" required />
+        <label for="createFocusNameInput">Focus Name</label>
+        <input id="createFocusNameInput" type="text" required placeholder="Shown in game (localization text)" />
+        <label for="createFocusXInput">Grid X</label>
+        <input id="createFocusXInput" type="number" required step="1" />
+        <label for="createFocusYInput">Grid Y</label>
+        <input id="createFocusYInput" type="number" required step="1" />
+        <div class="effect-amount-actions">
+          <button type="button" id="createFocusCancelBtn">Cancel</button>
+          <button type="submit" id="createFocusApplyBtn">Create</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="treeOwnerDialog" class="effect-amount-dialog tree-owner-dialog">
+      <div class="tree-owner-inner">
+        <div class="dialog-header tree-owner-header">
+          <h2>Which Country Uses This Tree</h2>
+          <button type="button" id="treeOwnerCloseBtn" class="settings-close-btn-boxed" aria-label="Close">&times;</button>
+        </div>
+        <div class="tree-owner-body">
+          <p id="treeOwnerTreeInfo" class="tree-owner-treeinfo"></p>
+
+          <!-- Current state, in plain language (filled on open). -->
+          <div id="treeOwnerCurrent" class="tree-owner-current tree-owner-current--none">Not assigned to any country yet.</div>
+
+          <label class="tree-owner-label" for="treeOwnerTag" id="treeOwnerCountryLabel">Country</label>
+          <div class="tree-owner-country-row" id="treeOwnerCountryRow">
+            <input id="treeOwnerTag" type="text" maxlength="3" list="treeOwnerCountryList" placeholder="Type a tag, e.g. GRE" autocomplete="off" style="text-transform:uppercase" />
+            <span id="treeOwnerCountryName" class="tree-owner-country-name"></span>
+          </div>
+          <datalist id="treeOwnerCountryList"></datalist>
+          <!-- Shown when the tree's country rule is richer than one tag (OR lists, DLC gates): Nova would
+               have to delete those conditions to rewrite it, so it edits the weight only. -->
+          <p id="treeOwnerComplex" class="tree-owner-compete" hidden>This tree picks its countries with extra conditions (a country list and/or a DLC gate). Nova won't rewrite that rule — it would delete those conditions — so the country can't be changed here. The selection weight below still applies.</p>
+          <!-- Depth: warns when the chosen country already has a competing tree to out-weigh. -->
+          <p id="treeOwnerCompete" class="tree-owner-compete" hidden></p>
+          <!-- #two-default-trees — shown when the mod already has a default tree, so the "Shared /
+               fallback" preset leaves the Advanced checkbox alone instead of writing a second one. Its
+               own element: syncTreeOwnerCompete() re-hides treeOwnerCompete on every call. -->
+          <p id="treeOwnerDefaultTaken" class="tree-owner-compete" hidden></p>
+
+          <label class="tree-owner-label">How should the game choose this tree?</label>
+          <div class="tree-owner-modes" role="radiogroup">
+            <label class="tree-owner-mode">
+              <input type="radio" name="treeOwnerMode" value="override" checked />
+              <span class="tree-owner-mode-text"><strong>Make this the country's tree</strong><small>Overrides another mod's tree for this country — use this for a country overhaul.</small></span>
+            </label>
+            <label class="tree-owner-mode">
+              <input type="radio" name="treeOwnerMode" value="fallback" />
+              <span class="tree-owner-mode-text"><strong>Shared / fallback tree</strong><small>Used by any country that doesn't have its own tree.</small></span>
+            </label>
+          </div>
+
+          <details class="tree-owner-advanced">
+            <summary>Advanced</summary>
+            <div class="tree-owner-advanced-body">
+              <label class="tree-owner-check"><input id="treeOwnerWeightCustom" type="checkbox" /> <span>Set a custom selection weight <span class="path-row-hint">(off = 100 for a country tree, 2 for a shared one — both safe)</span></span></label>
+              <label class="tree-owner-label" for="treeOwnerWeight">Selection weight <span class="path-row-hint">(highest weight wins; vanilla's own country trees use 10)</span></label>
+              <input id="treeOwnerWeight" type="number" min="1" step="1" value="100" disabled />
+              <label class="tree-owner-check"><input id="treeOwnerDefault" type="checkbox" /> <span>Also mark as the default / fallback tree (for countries without their own)</span></label>
+            </div>
+          </details>
+
+          <p id="treeOwnerStatus" class="effect-amount-focus tree-owner-status"></p>
+          <div class="effect-amount-actions">
+            <button type="button" id="treeOwnerCancelBtn">Cancel</button>
+            <button type="button" id="treeOwnerApplyBtn">Save</button>
+          </div>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog id="deleteFocusDialog" class="effect-amount-dialog">
+      <form id="deleteFocusForm" method="dialog" class="effect-amount-form">
+        <h3>Delete Focuses</h3>
+        <p id="deleteFocusSummary" class="effect-amount-focus">Delete selected focuses?</p>
+        <p class="effect-amount-focus">This removes their focus blocks and cleans references from prerequisite/mutually_exclusive sections.</p>
+        <div class="effect-amount-actions">
+          <button type="button" id="deleteFocusCancelBtn">Cancel</button>
+          <button type="submit" id="deleteFocusApplyBtn">Delete</button>
+        </div>
+      </form>
+    </dialog>
+
+    
+    <dialog id="helpDialog" class="help-dialog">
+      <div class="help-dialog-inner">
+        <div class="dialog-header">
+          <h2>Focus Tree Controls</h2>
+          <button type="button" id="helpDialogHeaderCloseBtn" class="settings-close-btn-boxed">&times;</button>
+        </div>
+        <div class="dialog-body" style="max-height: 70vh; overflow-y: auto;">
+          <section class="help-section">
+            <h3>Arranging focuses</h3>
+            <p>Open a tree with <strong>Load</strong>, drag focuses where you want, then click <strong>Save</strong> when you are happy with the layout.</p>
+          </section>
+          <section class="help-section">
+            <h3>Saving and closing the tab</h3>
+            <p>
+              Use <strong>Save</strong> (or <strong>Autosave</strong> when it is on) to write changes to disk. If the tree still has
+              <strong>unsaved</strong> edits and a save is not in progress, the browser may show a warning when you close or refresh the tab
+              (the exact message is up to the browser).
+            </p>
+            <p class="help-muted">
+              Autosave only runs when validation passes, no blocking dialog is open, and pending name or description edits have a
+              localization file target — hover the Autosave checkbox for details when something is paused.
+            </p>
+          </section>
+          <section class="help-section">
+            <h3>Selecting several at once</h3>
+            <p>Click and drag on empty space to draw a box around the focuses you want.</p>
+          </section>
+          <section class="help-section">
+            <h3>Refining the selection</h3>
+            <ul>
+              <li><strong>Single click</strong> a focus to select only that one.</li>
+              <li><strong>Shift + click</strong> or <strong>Ctrl + click</strong> to add or remove a focus from what you already have selected.</li>
+            </ul>
+          </section>
+          <section class="help-section">
+            <h3>Moving around the map</h3>
+            <ul>
+              <li><strong>Pan:</strong> hold the <strong>right mouse button</strong> and drag on empty space.</li>
+              <li><strong>Clear selection:</strong> a quick <strong>right-click</strong> on empty space (without dragging) clears the selection.</li>
+            </ul>
+          </section>
+          <section class="help-section">
+            <h3>Zoom</h3>
+            <ul>
+              <li><strong>Z</strong> zooms out, <strong>X</strong> zooms in (same as the − / + buttons).</li>
+              <li><strong>Ctrl + −</strong> zooms out, <strong>Ctrl + +</strong> zooms in.</li>
+              <li><strong>Ctrl + 0</strong> resets zoom to normal (100%).</li>
+            </ul>
+          </section>
+          <section class="help-section">
+            <h3>Undo, redo, Escape</h3>
+            <ul>
+              <li><strong>Ctrl+Z</strong> undoes. <strong>Ctrl+Shift+Z</strong> or <strong>Ctrl+Y</strong> redoes.</li>
+              <li>
+                This editor also maps <strong>Ctrl+X</strong> to <strong>redo</strong> (not “cut” to clipboard). Use
+                <strong>Ctrl+C</strong> / <strong>Ctrl+V</strong> for copy and paste in text fields.
+              </li>
+              <li><strong>Escape</strong> closes the right-click menu, open dialogs, and prerequisite / mutually-exclusive link modes.</li>
+            </ul>
+          </section>
+          <section class="help-section">
+            <h3>Toolbar height</h3>
+            <p>Drag the thin bar under this panel (above the tree) up or down to give yourself more or less room for the map.</p>
+          </section>
+          <section class="help-section">
+            <h3>Effects and details</h3>
+            <p><strong>Right-click</strong> a focus to open the menu. Under <strong>Effects</strong>, use the search field to filter commands; <strong>Open focus tree file</strong> opens the loaded <code>.txt</code> in Notepad for hand-editing (reload in the editor after you save there).</p>
+          </section>
+          <section class="help-section">
+            <h3>Prerequisites (must finish before this focus)</h3>
+            <p>
+              In Hearts of Iron IV, a <strong>prerequisite</strong> is always on the <em>later</em> focus: it lists which <em>earlier</em> focuses must be completed first. The editor matches that: right-click the focus that should wait (the dependent one),
+              choose <strong>Requires earlier focus…</strong>, then click the focus that must be done before it. The dashed line runs from your focus while you choose; saved arrows run parent → child like the game tree.
+            </p>
+            <p>
+              Use <strong>Remove requirement…</strong> when this focus already has requirements, then click the earlier focus you want to unlink.
+            </p>
+          </section>
+          <section class="help-section">
+            <h3>Debugging</h3>
+            <p>Expand <strong>Debug / error log</strong> in the toolbar. Use <strong>Copy report</strong> to copy diagnostics, a JSON session snapshot (paths, selection, pending edits, flags), and the log — paste into Cursor or an issue. URL hints: <code>?debug=1</code> opens the panel, <code>?debugVerbose=1</code> turns on verbose logging.</p>
+          </section>
+        </div>
+        <div class="dialog-body" style="padding-top: 0; display: flex; justify-content: flex-end;">
+          <button type="button" id="helpDialogCloseBtn" class="secondary-btn-premium">Close</button>
+        </div>
+      </div>
+    </dialog>
+
+
+    <dialog id="startupChoiceDialog" class="effect-amount-dialog">
+      <form method="dialog" class="effect-amount-form">
+        <h3>Start Editing</h3>
+        <p class="effect-amount-focus">Choose how you want to begin.</p>
+        <div class="effect-amount-actions effect-amount-actions--stack">
+          <button type="button" id="startupLoadBtn">Load Existing Focus Tree...</button>
+          <button type="button" id="startupCreateModBtn">Create Focus Tree (New Mod)...</button>
+          <button type="button" id="startupCreateExistingModBtn">Create Focus Tree (Existing Mod)...</button>
+          <button type="button" id="startupCreateTemplateBtn" style="background: linear-gradient(135deg, #238636 0%, #2ea043 100%); font-weight: bold; color: white;">Create New Country Storyline (Template)...</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="createExistingModTreeDialog" class="effect-amount-dialog">
+      <form id="createExistingModTreeForm" method="dialog" class="effect-amount-form">
+        <h3>Create Focus Tree (Existing Mod)</h3>
+        <p class="effect-amount-focus">Add a brand new focus tree file directly into an existing mod's national_focus folder.</p>
+        <label for="existingModPathInput">Existing Mod Folder Path</label>
+        <input id="existingModPathInput" type="text" required placeholder="C:\Users\...\Documents\Paradox Interactive\Hearts of Iron IV\mod\my_mod" />
+        <label for="existingModTreeNameInput">Focus Tree File Name (e.g. germany_expanded)</label>
+        <input id="existingModTreeNameInput" type="text" required placeholder="germany_expanded" />
+        <div class="effect-amount-actions">
+          <button type="button" id="createExistingModTreeCancelBtn">Cancel</button>
+          <button type="submit" id="createExistingModTreeApplyBtn">Create File</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="createModDialog" class="effect-amount-dialog">
+      <form id="createModForm" method="dialog" class="effect-amount-form">
+        <h3>Create New Mod</h3>
+        <p class="effect-amount-focus">Is this a standalone mod, or an add-on built on top of another mod?</p>
+        <div class="mod-type-toggle" role="group" aria-label="Mod type">
+          <button type="button" id="createModTypeStandaloneBtn" class="mod-type-option is-active" aria-pressed="true">
+            <span class="mod-type-title">Standalone</span>
+            <span class="mod-type-sub">A new mod on its own</span>
+          </button>
+          <button type="button" id="createModTypeAddonBtn" class="mod-type-option" aria-pressed="false">
+            <span class="mod-type-title">Add-on</span>
+            <span class="mod-type-sub">Loads on top of another mod &amp; inherits it</span>
+          </button>
+        </div>
+        <label for="createModNameInput">Mod Name</label>
+        <input id="createModNameInput" type="text" required placeholder="My Focus Mod" />
+        <label for="createModDisplayNameInput">Display Name (optional)</label>
+        <input id="createModDisplayNameInput" type="text" placeholder="My Focus Mod" />
+        <div id="createModAddonFields" style="display:none;">
+          <label for="createModDependenciesInput">Base mod name — the mod this depends on</label>
+          <input id="createModDependenciesInput" type="text" placeholder="Millennium Dawn: A Modern Day Mod" title="Use the base mod's EXACT descriptor name (not the workshop number). Separate multiple with a comma or new line." />
+          <p class="effect-amount-focus" style="margin-top:4px; opacity:0.8;">Your add-on loads AFTER this mod and inherits its content; items you make with the same ID override it.</p>
+        </div>
+        <p class="effect-amount-focus" id="createModPreviewLabel"></p>
+        <div class="effect-amount-actions">
+          <button type="button" id="createModCancelBtn">Cancel</button>
+          <button type="submit" id="createModApplyBtn">Create Mod</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="createTemplateDialog" class="effect-amount-dialog">
+      <form id="createTemplateForm" method="dialog" class="effect-amount-form">
+        <h3>Create Storyline (Template)</h3>
+        <p class="effect-amount-focus">Scaffolds a new playable mod containing a custom country, capital state, starting techs, a 3-focus starter tree, custom national spirit, event, decision category, and localization.</p>
+
+        <p class="effect-amount-focus">Is this a standalone mod, or an add-on built on top of another mod?</p>
+        <div class="mod-type-toggle" role="group" aria-label="Mod type">
+          <button type="button" id="createTemplateTypeStandaloneBtn" class="mod-type-option is-active" aria-pressed="true">
+            <span class="mod-type-title">Standalone</span>
+            <span class="mod-type-sub">A new mod on its own</span>
+          </button>
+          <button type="button" id="createTemplateTypeAddonBtn" class="mod-type-option" aria-pressed="false">
+            <span class="mod-type-title">Add-on</span>
+            <span class="mod-type-sub">Adds this country on top of another mod</span>
+          </button>
+        </div>
+        <div id="createTemplateAddonFields" style="display:none;">
+          <label for="createTemplateDependenciesInput">Base mod name — the mod this depends on</label>
+          <input id="createTemplateDependenciesInput" type="text" placeholder="Millennium Dawn: A Modern Day Mod" title="Use the base mod's EXACT descriptor name (not the workshop number). Separate multiple with a comma or new line." />
+          <p class="effect-amount-focus" style="margin-top:4px; opacity:0.8;">Your add-on loads AFTER this mod and inherits its content. Make sure the country tag &amp; capital state don't collide with the base mod.</p>
+        </div>
+
+        <label for="createTemplateModNameInput">Mod Name</label>
+        <input id="createTemplateModNameInput" type="text" required placeholder="My Atlantis Storyline" />
+
+        <label for="createTemplateCountryNameInput">Country Name</label>
+        <input id="createTemplateCountryNameInput" type="text" required placeholder="Atlantis" />
+
+        <label for="createTemplateCountryTagInput">Country Tag (exactly 3 letters/numbers)</label>
+        <input id="createTemplateCountryTagInput" type="text" required maxlength="3" placeholder="ATL" style="text-transform: uppercase;" />
+
+        <label for="createTemplateCapitalInput">Capital State ID (e.g. 1 or 64)</label>
+        <input id="createTemplateCapitalInput" type="number" required min="1" step="1" value="64" />
+
+        <label for="createTemplateColorInput">Country Color (RGB, e.g. 120 10 50)</label>
+        <input id="createTemplateColorInput" type="text" placeholder="120 10 50" />
+
+        <p class="effect-amount-focus" id="createTemplatePreviewLabel" style="white-space: pre-line; background: #010409; padding: 10px; border-radius: 6px; font-family: monospace; font-size: 11px; color: #8b949e;"></p>
+
+        <div class="effect-amount-actions">
+          <button type="button" id="createTemplateCancelBtn">Cancel</button>
+          <button type="submit" id="createTemplateApplyBtn">Create Storyline</button>
+        </div>
+      </form>
+    </dialog>
+
+    <template id="nodeTemplate">
+      <div class="node">
+        <div class="node-scaled">
+          <img class="node-bg" alt="" draggable="false" />
+          <div class="node-icon-host">
+            <img class="node-icon" alt="" draggable="false" />
+          </div>
+          <div class="node-title-container">
+            <div class="node-title"></div>
+          </div>
+          <div class="node-meta"></div>
+          <div class="node-xy"></div>
+        </div>
+      </div>
+    </template>
+  
+    <!-- Premium Settings Dialog -->
+    
+    <!-- Premium Settings Dialog -->
+    <dialog id="settingsDialog" class="help-dialog">
+      <div class="help-dialog-inner">
+        <div class="dialog-header">
+          <h2>Editor Settings</h2>
+          <button type="button" id="settingsCloseBtn" class="settings-close-btn-boxed">&times;</button>
+        </div>
+        <div class="dialog-body">
+          
+          <div class="settings-card">
+            <h3>Display & Interpretation</h3>
+            <label class="toggle-row-premium">
+              <input id="genesisSettingsToggle" type="checkbox" checked style="width:16px; height:16px;" />
+              <div>
+                <div style="font-weight:600; font-size:14px;">Genesis View (Code-to-English)</div>
+                <div style="color:#8b949e; font-size:12px; margin-top:2px;">Translates raw HOI4 scripts into readable English descriptions.</div>
+              </div>
+            </label>
+          </div>
+
+          <div class="settings-card">
+            <h3>Canvas Dynamics</h3>
+            <label class="toggle-row-premium">
+              <input id="autoExpandSettingsToggle" type="checkbox" checked style="width:16px; height:16px;" />
+              <div>
+                <div style="font-weight:600; font-size:14px;">Infinite Canvas Growth</div>
+                <div style="color:#8b949e; font-size:12px; margin-top:2px;">Automatically stretches as you drag focuses to edges.</div>
+              </div>
+            </label>
+          </div>
+
+          <div class="settings-card">
+            <h3>AI Logic Configuration</h3>
+            <p style="color:#8b949e; font-size:13px; margin:0;">Your Gemini API key now lives on the <a href="home.html" style="color:#58a6ff; text-decoration:underline; font-weight:600;">Home page</a> — set it once there and it powers the ✨ AI buttons on every tool, including this one.</p>
+          </div>
+
+          <div class="settings-card">
+            <h3>Manual Workspace Sizing</h3>
+            <p style="color:#8b949e; font-size:12px; margin-bottom:6px;">Override the auto-sizing logic with custom dimensions. The boxes show the current canvas size — you can't shrink below what the focuses need.</p>
+            <p id="canvasSizeCurrentHint" style="color:#58a6ff; font-size:12px; margin:0 0 12px; font-variant-numeric:tabular-nums;">Load a focus tree to see its canvas size.</p>
+            <div style="display:flex; align-items:center; gap:12px; margin-top:12px;">
+              <div style="display:flex; flex-direction:column; gap:4px;">
+                <span style="font-size:11px; color:#8b949e;">WIDTH (PX)</span>
+                <input id="canvasWidthInput" type="number" class="input-field-premium" placeholder="Auto" />
+              </div>
+              <div style="display:flex; flex-direction:column; gap:4px;">
+                <span style="font-size:11px; color:#8b949e;">HEIGHT (PX)</span>
+                <input id="canvasHeightInput" type="number" class="input-field-premium" placeholder="Auto" />
+              </div>
+              <div style="display:flex; flex-direction:column; gap:4px;">
+                <span style="font-size:11px; color:#8b949e;">SCALE (%)</span>
+                <input id="canvasScaleInput" type="number" class="input-field-premium" placeholder="100" min="100" step="5" title="100% = the canvas size when you opened this tree. Raise it to add room; it stays at your chosen % after saving." />
+              </div>
+              <div style="margin-left:auto; display:flex; gap:8px; align-self:flex-end;">
+                <button id="fitCanvasBtn" class="secondary-btn-premium" title="Shrink the canvas to wrap the tree tightly (equal margins)">Fit Canvas to Tree</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-card">
+            <h3>Focus Debugger</h3>
+            <p style="color:#8b949e; font-size:12px; margin-bottom:12px;">Logs, live state, and diagnostics for this focus-tree editor. Also opens automatically when an error occurs.</p>
+            <button type="button" id="settingsOpenDebuggerBtn" class="secondary-btn-premium" title="Open the focus debugger">🐞 Open Focus Debugger</button>
+          </div>
+
+          <div style="display:flex; justify-content:flex-end; margin-top:10px;">
+             <button id="settingsDoneBtn" class="primary-btn-premium">Done</button>
+          </div>
+
+        </div>
+      </div>
+    </dialog>
+
+
+
+    <!-- Icon Picker Modal -->
+    <div id="iconPickerModal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>Select Focus Icon</h2>
+          <span id="closeIconPicker" class="modal-close">&times;</span>
+        </div>
+        <input type="text" id="iconPickerSearch" class="modal-search" placeholder="🔍 Search icons by name (e.g. industry, defense, navy, air, army, political)..." />
+        <div id="iconPickerGrid" class="modal-grid-focus-icons">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+    </div>
+
+    <script src="./genesis-engine.js?v=23"></script>
+    <script src="./app.js?v=basegame46"></script>
+    <script src="./ai-field-assist.js"></script>
+  <script src="./version-banner.js"></script>
+  </body>
+</html>

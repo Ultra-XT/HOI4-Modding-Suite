@@ -1,0 +1,7 @@
+{
+  "about": "The Electron and Chromium versions Nova ships, and the FFmpeg revision, for the source offer in THIRD-PARTY-NOTICES.txt. scripts/gen-third-party-notices.js refuses when node_modules/electron/package.json names another Electron, or when Electron itself reports another Chromium, so every Electron bump forces this file, and the DEPS pin of FFmpeg, to be looked at again. ffmpegRevision is null while nobody has read it out of Chromium's DEPS file at this tag; the notice then points at that DEPS file, which fixes the revision exactly.",
+  "electron": "41.2.1",
+  "chromium": "146.0.7680.188",
+  "ffmpegRevision": null,
+  "checked": "2026-11-15: node_modules/electron/package.json says 41.2.1; ELECTRON_RUN_AS_NODE=1 electron.exe -p process.versions.chrome says 146.0.7680.188. ffmpeg.dll carries no version string, and Chromium's DEPS is not on this machine."
+}

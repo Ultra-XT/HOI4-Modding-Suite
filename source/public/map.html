@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Map Editor — Nova Modding Suite</title>
+  <link rel="stylesheet" href="./styles.css?v=suite103" />
+  <style>
+    #mapWrap { position: relative; width: 100%; height: calc(100vh - 200px); min-height: 420px;
+      background: #0d1117; border: 1px solid #30363d; border-radius: 8px; overflow: hidden; cursor: grab; }
+    #mapWrap.panning { cursor: grabbing; }
+    /* Photoshop-style live readout: what's under the cursor (province / state / owner). */
+    #mapHud { position: absolute; bottom: 10px; left: 10px; z-index: 6; pointer-events: none;
+      background: rgba(13,17,23,0.86); border: 1px solid #30363d; border-radius: 6px;
+      color: #c9d1d9; font-size: 12px; font-family: ui-monospace, monospace; padding: 5px 10px;
+      max-width: 60%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #mapHud .hud-tag { color: #58a6ff; font-weight: 700; }
+    #mapHud .hud-dim { color: #6e7681; }
+    /* Overview minimap (top-left, clear of the right-hand info panel + bottom-left HUD): downscaled map
+       + the current viewport box; click to jump. */
+    /* left:184 (not 10) so the minimap clears the vertical tool dock — which grew to ~15 tools and, on
+       common laptop heights / when expanded, is tall enough to cover the top-left where the minimap used
+       to sit, making click-to-jump on the map's left half impossible. #minimap-clear-dock */
+    #mapMinimap { position: absolute; top: 10px; left: 184px; z-index: 6; cursor: crosshair;
+      background: rgba(13,17,23,0.9); border: 1px solid #30363d; border-radius: 6px; }
+    #mapCanvas { position: absolute; top: 0; left: 0; image-rendering: pixelated; }
+    .map-toolbar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+    .map-toolbar select, .map-toolbar button { padding: 6px 10px; background: #161b22; border: 1px solid #30363d;
+      border-radius: 4px; color: #c9d1d9; font-size: 13px; }
+    .map-toolbar button { cursor: pointer; }
+    .map-toolbar button.active { background: #1f6feb; border-color: #1f6feb; color: #fff; }
+    /* Pulse the country picker when Paint mode needs a country chosen (answers "how do I select a country?"). */
+    @keyframes ccPulse { 0%,100% { box-shadow: 0 0 0 0 rgba(31,111,235,.0); } 50% { box-shadow: 0 0 0 3px rgba(31,111,235,.7); } }
+    #mapCountrySelect.cc-pulse { animation: ccPulse 0.8s ease-in-out 3; border-color: #1f6feb; }
+    #mapInfo { position: absolute; top: 10px; right: 10px; width: 250px; background: rgba(13,17,23,0.94);
+      border: 1px solid #30363d; border-radius: 8px; padding: 12px; font-size: 13px; color: #c9d1d9; pointer-events: auto;
+      max-height: calc(100% - 20px); overflow-y: auto; overscroll-behavior: contain; }
+    #mapInfoMin { position: absolute; top: 4px; right: 6px; background: transparent; border: none; color: #8b949e;
+      font-size: 18px; line-height: 1; cursor: pointer; padding: 0 4px; }
+    #mapInfoMin:hover { color: #c9d1d9; }
+    #mapInfoShow { display: none; position: absolute; top: 10px; right: 10px; z-index: 6; background: rgba(13,17,23,0.92);
+      border: 1px solid #30363d; border-radius: 6px; color: #c9d1d9; font-size: 12px; padding: 4px 9px; cursor: pointer; }
+    #mapInfoShow:hover { border-color: #1f6feb; }
+    #mapInfo h3 { margin: 0 18px 8px 0; font-size: 14px; }
+    #mapInfo .row { display: flex; justify-content: space-between; gap: 8px; margin: 3px 0; }
+    #mapInfo .row span:first-child { color: #8b949e; }
+    /* 🪖 Army panel */
+    .army-mode-btn { background:#21262d; border:1px solid #30363d; color:#c9d1d9; border-radius:6px; cursor:pointer; font-size:12px; font-weight:600; padding:7px; flex:1; transition:background .12s,border-color .12s; }
+    .army-mode-btn:hover { background:#2d333b; }
+    .army-mode-btn.active { background:#1f6feb33; border-color:#1f6feb; color:#fff; }
+    /* 🏳 Country card #country-card */
+    #mapCountryCard { display:none; position:absolute; top:10px; left:10px; width:300px; background:rgba(13,17,23,0.96); border:1px solid #30363d; border-radius:10px; padding:12px 14px; color:#c9d1d9; font-size:12px; z-index:8; box-shadow:0 6px 24px rgba(0,0,0,0.5); max-height:calc(100% - 20px); overflow:auto; }
+    #mapCountryCard h4 { margin:12px 0 4px; font-size:11px; font-weight:600; color:#8b949e; text-transform:uppercase; letter-spacing:.04em; }
+    #mapCountryCard .cc-row { display:flex; justify-content:space-between; gap:8px; margin:2px 0; }
+    #mapCountryCard .cc-row span:first-child { color:#8b949e; }
+    #mapCountryCard .cc-note { color:#6e7681; font-size:11px; }
+    #mapCountryCard .cc-focus { padding:6px 8px; border-radius:6px; border:1px solid #30363d; background:#161b22; line-height:1.4; }
+    #mapCountryCard .cc-focus.warn { border-color:#9e6a03; background:#2d2305; color:#f0d58a; }
+    #mapCountryCard .cc-links { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-top:12px; }
+    #mapCountryCard .cc-links button { background:#21262d; border:1px solid #30363d; color:#c9d1d9; border-radius:6px; cursor:pointer; font-size:12px; padding:7px 6px; text-align:left; }
+    #mapCountryCard .cc-links button:hover { background:#2d333b; border-color:#1f6feb; }
+    #mapCountryCard .cc-links button:focus-visible { outline:2px solid #1f6feb; outline-offset:1px; }
+    .army-tpl-row { display:flex; align-items:center; gap:6px; background:#161b22; border:1px solid #30363d; border-radius:6px; padding:6px 8px; cursor:pointer; transition:border-color .12s,background .12s; }
+    .army-tpl-row:hover { border-color:#4b5563; }
+    .army-tpl-row.active { border-color:#58a6ff; background:#1f6feb22; }
+    .army-tpl-row .army-tpl-name { font-weight:600; color:#e6edf3; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .army-tpl-row .army-tpl-meta { color:#8b949e; font-size:10.5px; white-space:nowrap; }
+    .army-preset-opt { background:#161b22; border:1px solid #30363d; border-radius:5px; padding:5px 8px; cursor:pointer; color:#c9d1d9; font-size:11px; }
+    .army-preset-opt:hover { border-color:#2ea043; color:#fff; }
+    .mi-help { cursor: pointer; color: #58a6ff; font-weight: 700; user-select: none; }
+    .mi-help:hover { color: #79c0ff; }
+    /* Resource amount inputs: the number-spinner arrows ate the width and clipped 2-digit values.
+       Hide the spinner, widen a touch, right-align so the full number is always readable. */
+    #miResources input[type="number"] { width: 46px !important; text-align: right; -moz-appearance: textfield; appearance: textfield; }
+    #miResources input[type="number"]::-webkit-outer-spin-button,
+    #miResources input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    .map-autosave-note { font-size: 11px; color: #8b949e; margin: 0 0 10px; }
+    .map-autosave-note b { color: #3fb950; }
+    details.map-autosave-note > summary { cursor: pointer; list-style: none; outline: none; user-select: none; }
+    details.map-autosave-note > summary::-webkit-details-marker { display: none; }
+    details.map-autosave-note .map-note-more { color: #58a6ff; font-weight: 600; }
+    details.map-autosave-note[open] .map-note-more::after { content: " ▲"; }
+    details.map-autosave-note:not([open]) .map-note-more::after { content: " ▼"; }
+    details.map-autosave-note .map-note-body { margin-top: 6px; line-height: 1.55; }
+    #mapStatus { font-size: 12px; color: #8b949e; margin-left: auto; }
+    .map-swatch { display: inline-block; width: 12px; height: 12px; border-radius: 2px; vertical-align: middle; margin-right: 5px; border: 1px solid #0008; }
+    /* Adobe-style vertical tool dock pinned to the left of the map. Icons-only by default; the » / «
+       toggle expands it to show each tool's name (we keep adding tools, so it has to scale). It floats
+       inside #mapWrap, vertically centred so it clears the minimap (top-left) and the HUD (bottom-left). */
+    #mapToolPanel { position: absolute; top: 50%; left: 10px; transform: translateY(-50%); z-index: 8;
+      display: flex; flex-direction: column; gap: 3px; padding: 5px; max-height: calc(100% - 24px); overflow-y: auto;
+      background: rgba(13,17,23,0.94); border: 1px solid #30363d; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.5); }
+    #mapToolToggle { display: flex; align-items: center; justify-content: center; height: 24px; margin-bottom: 3px;
+      background: #161b22; border: 1px solid #30363d; border-radius: 5px; color: #8b949e; font-size: 13px; cursor: pointer; }
+    #mapToolToggle:hover { color: #c9d1d9; border-color: #1f6feb; }
+    /* Fixed row HEIGHT (border-box) so expanding to show names doesn't make the dock taller — only wider. */
+    .map-tool { display: flex; align-items: center; gap: 8px; padding: 0 8px; height: 30px; flex: 0 0 30px; background: transparent;
+      border: 1px solid transparent; border-radius: 5px; color: #c9d1d9; font-size: 13px; cursor: pointer;
+      text-align: left; white-space: nowrap; width: 100%; box-sizing: border-box; }
+    .map-tool:hover { background: #21262d; border-color: #30363d; }
+    .map-tool.active { background: #1f6feb; border-color: #1f6feb; color: #fff; }
+    .map-tool .tool-ico { flex: 0 0 20px; text-align: center; font-size: 15px; line-height: 1; }
+    .map-tool .tool-name { flex: 1; line-height: 1; }
+    #mapToolPanel.collapsed .map-tool { justify-content: center; gap: 0; padding: 6px; }
+    #mapToolPanel.collapsed .map-tool .tool-name { display: none; }
+    /* Collapsed = a 2-column icon grid so all ~15 tools fit in ~8 rows without scrolling below the fold
+       (a single column overflowed on laptop heights, hiding the Army / New-country tools). Expanded stays
+       a 1-column list so the names read. #dock-grid */
+    #mapToolPanel.collapsed { display: grid; grid-template-columns: repeat(2, 30px); gap: 3px; align-content: start; }
+    #mapToolPanel.collapsed #mapToolToggle, #mapToolPanel.collapsed .map-tool-sep { grid-column: 1 / -1; }
+    /* Divider grouping the everyday tools from the heavy world-building ones (Erase / Move country). */
+    .map-tool-sep { flex: 0 0 1px; height: 1px; background: #30363d; margin: 4px 4px; }
+    /* Adjacency: pick the link kind as explained CARDS, not a terse 2-item dropdown (clearer for a confusing feature). */
+    .adj-card { display: block; width: 100%; text-align: left; background: #161b22; border: 1px solid #30363d;
+      border-radius: 6px; padding: 7px 9px; color: #c9d1d9; cursor: pointer; box-sizing: border-box; }
+    .adj-card:hover { border-color: #58a6ff; }
+    .adj-card.selected { border-color: #39d0ff; box-shadow: inset 0 0 0 1px #39d0ff; background: #172734; }
+    .adj-card .adj-card-t { font-weight: 600; font-size: 12.5px; }
+    .adj-card .adj-card-d { color: #8b949e; font-size: 11px; margin-top: 2px; line-height: 1.4; }
+    /* Keyboard shortcuts modal: keycaps; the tool ones are clickable to rebind. */
+    .kbd { display: inline-block; min-width: 18px; text-align: center; padding: 1px 7px; background: #161b22;
+      border: 1px solid #30363d; border-bottom-width: 2px; border-radius: 4px; font-family: ui-monospace, monospace;
+      font-size: 11px; color: #c9d1d9; }
+    button.keycap { cursor: pointer; }
+    button.keycap:hover { border-color: #58a6ff; color: #fff; }
+    button.keycap.capturing { border-color: #39d0ff; color: #39d0ff; background: #172734; }
+    .map-keys-row { display: flex; justify-content: space-between; align-items: center; padding: 3px 2px; }
+    /* Layers dropdown rows */
+    .layer-row { display: flex; align-items: center; gap: 8px; padding: 4px 6px; font-size: 12px; color: #c9d1d9;
+      cursor: pointer; white-space: nowrap; border-radius: 4px; }
+    .layer-row:hover { background: #161b22; }
+    .layer-row input { margin: 0; }
+    /* Colour key: a swatch matching how each layer looks on the map (a non-intrusive legend in the Layers menu). */
+    .layer-key { flex: 0 0 auto; display: inline-block; box-sizing: border-box; }
+  </style>
+  <link rel="icon" href="favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" href="favicon.png">
+</head>
+<body>
+  <nav class="suite-nav">
+    <a href="home.html" class="suite-nav-link" data-i18n="nav.home">Home</a>
+    <a href="country-setup.html" class="suite-nav-link" data-i18n="nav.countrySetup">Country Setup</a>
+    <a href="characters.html" class="suite-nav-link" data-i18n="nav.characters">Characters</a>
+    <a href="ideas.html" class="suite-nav-link" data-i18n="nav.nationalSpirits">National Spirits</a>
+    <a href="research.html" class="suite-nav-link" data-i18n="nav.researchTree">Research Tree</a>
+    <a href="index.html" class="suite-nav-link" data-i18n="nav.focusTree">Focus Tree</a>
+    <a href="events.html" class="suite-nav-link" data-i18n="nav.events">Events</a>
+    <a href="decisions.html" class="suite-nav-link" data-i18n="nav.decisions">Decisions</a>
+    <a href="map.html" class="suite-nav-link active" data-i18n="nav.mapEditor">Map Editor</a>
+        <a href="army.html" class="suite-nav-link" data-i18n="nav.military">Military</a>
+    <a href="modhealth.html" class="suite-nav-link" data-i18n="nav.modHealth">Mod Health</a>
+
+    <!-- target="_blank" is load-bearing, not decoration. main.js blocks in-window navigation to any
+         non-app origin (will-navigate -> preventDefault + "network blocked" warning), but routes a
+         window-open to an https URL through shell.openExternal. So this opens the user's real browser;
+         a plain href would look like an error. -->
+    <a href="https://discord.gg/Z6P23hjEsM" target="_blank" rel="noopener noreferrer"
+       class="suite-nav-link suite-nav-discord" style="margin-left:auto;"
+       title="Join the Nova Discord — report bugs and ask questions"><svg class="suite-nav-discord-mark" viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true" focusable="false"><path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z"/></svg>Discord</a>
+  </nav>
+
+  <main style="padding: 18px 24px;">
+    <h1 style="font-size: 20px; margin: 0 0 4px;">Map Editor <span style="font-size:12px;color:#8b949e;font-weight:normal;">— edit borders, states, provinces, regions &amp; supply, and ⚠ Map Errors to catch crashes before you launch</span></h1>
+    <p style="font-size:13px;color:#8b949e;margin:0 0 14px;">Loads the base game + your mod's states. Pick a country, then click states on the map to give them to that country. 💾 Save writes your edits into your mod: the state files, and every other file an edit belongs in (the map's own files, country colours, owners and capitals). A Save into a mod never changes the base game's files (when the map you are editing is the base game itself, Save asks first).</p>
+
+    <div id="mapVersionWarn" style="display:none; background:#3d2a00; border:1px solid #9e6a00; color:#f0c674; padding:10px 14px; border-radius:6px; margin:0 0 12px; font-size:13px; line-height:1.5;"></div>
+
+    <div class="map-toolbar">
+      <button id="mapSaveAll" style="background:#238636; border-color:#2ea043; color:#fff; font-weight:600;" title="Write all your pending map edits to your mod (Ctrl+S). Nothing is saved until you click this.">💾 Save changes (<span id="mapSaveCount">0</span>)</button>
+      <label style="font-size:13px;color:#8b949e;" title="Pick the country the brush paints. In Paint mode you can also click a country on the map to pick it up as the brush.">Paint country <span style="color:#6e7681;">(or click one on the map)</span>:
+        <select id="mapCountrySelect"><option value="">— select —</option></select>
+      </label>
+      <label id="mapCountryColorLabel" style="font-size:13px;color:#8b949e; display:inline-flex; align-items:center; gap:5px;" title="The selected country's map colour in common/countries/colors.txt. Geography — including colour — lives on the Map. Change it here: the map recolours at once, and 💾 Save writes it to colors.txt (an Undo step until then).">🎨 Colour
+        <input type="color" id="mapCountryColor" value="#808080" disabled style="width:34px; height:22px; padding:0; border:1px solid #30363d; border-radius:4px; background:#161b22; cursor:pointer; vertical-align:middle;" />
+      </label>
+      <button id="mapCountryCardBtn" title="Open the selected country's card: its focus tree, laws, national spirits and capital, and a way into each maker for that country.">🏳 Country card</button>
+      <button id="mapCountryStatsBtn" title="Aggregate the selected country's starting map footprint — states, provinces, factories, dockyards, population and victory points (read-only).">📊 Country stats</button>
+      <label style="font-size:12px; color:#8b949e;" title="Paint brush size in pixels (1–256). Type a value, or use [ / ] to step.">Brush
+        <input id="mapBrushSize" type="number" min="1" max="256" step="1" value="2" style="width:54px; padding:3px 5px; background:#161b22; border:1px solid #30363d; border-radius:4px; color:#c9d1d9; font-size:12px;" />px
+      </label>
+      <label style="font-size:12px;color:#8b949e;">Color by
+        <select id="mapColorBy" title="What the map fill shows">
+          <option value="owner" selected>Country</option>
+          <option value="terrain">Terrain</option>
+          <option value="region">Strategic region</option>
+          <option value="supply">Supply area</option>
+          <optgroup label="Heatmaps (data)">
+            <option value="heat_manpower">🔥 Population</option>
+            <option value="heat_factories">🔥 Factories (civ+mil+dock)</option>
+            <option value="heat_victory">🔥 Victory points</option>
+          </optgroup>
+        </select>
+      </label>
+      <span style="position:relative; display:inline-block;">
+        <button id="mapLayersBtn" title="Show or hide map layers — borders, labels, victory points, rivers, railways, supply hubs, adjacency links">▦ Layers ▾</button>
+        <div id="mapLayersMenu" style="display:none; position:absolute; top:100%; left:0; z-index:30; margin-top:4px; min-width:178px; background:#0d1117; border:1px solid #30363d; border-radius:6px; padding:5px; box-shadow:0 6px 22px rgba(0,0,0,0.55);">
+          <div style="font-size:10px; color:#8b949e; padding:2px 6px 5px; border-bottom:1px solid #21262d; margin-bottom:4px;">Toggle a layer — the swatch shows how it looks on the map.</div>
+          <label class="layer-row" title="Province / state / country outlines"><input type="checkbox" id="mapBorders" checked /> <span class="layer-key" style="width:11px;height:11px;border:1.5px solid #8b949e;background:transparent;border-radius:2px;"></span> Borders</label>
+          <label class="layer-row" title="State name labels (shown when zoomed in)"><input type="checkbox" id="mapShowLabels" checked /> <span class="layer-key" style="border:none;background:none;color:#e6edf3;font-size:11px;font-weight:700;line-height:1;">A</span> State labels</label>
+          <label class="layer-row" title="Victory-point markers — gold dots (shown as you zoom in)"><input type="checkbox" id="mapShowVps" checked /> <span class="layer-key" style="width:10px;height:10px;border-radius:50%;background:#f0c020;border:1px solid #1a1a1a;"></span> ★ Victory points</label>
+          <label class="layer-row" title="Railway lines (map/railways.txt) — brown"><input type="checkbox" id="mapShowRailways" checked /> <span class="layer-key" style="width:16px;height:3px;background:rgb(180,120,60);border-radius:2px;"></span> 🛤 Railways</label>
+          <label class="layer-row" title="Supply hub markers (map/supply_nodes.txt) — teal squares"><input type="checkbox" id="mapShowHubs" checked /> <span class="layer-key" style="width:10px;height:10px;background:#1fb39e;border:1px solid #0c3b35;"></span> 🏭 Supply hubs</label>
+          <label class="layer-row" title="Adjacency links — impassable (red) + sea straits (cyan)"><input type="checkbox" id="mapShowAdjacency" checked /> <span class="layer-key" style="width:16px;height:3px;background:linear-gradient(90deg,#f85149 50%,#39d0ff 50%);border-radius:2px;"></span> 🔗 Adjacency links</label>
+          <label class="layer-row" title="Rivers overlay (map/rivers.bmp); land is transparent — water-blue"><input type="checkbox" id="mapRivers" checked /> <span class="layer-key" style="width:16px;height:3px;background:#4a9ce2;border-radius:2px;"></span> 🌊 Rivers</label>
+        </div>
+      </span>
+      <button id="mapUndo" title="Undo the last edit (Ctrl+Z)" disabled style="opacity:0.5;">↶ Undo</button>
+      <button id="mapRedo" title="Redo (Ctrl+Y)" disabled style="opacity:0.5;">↷ Redo</button>
+      <button id="mapHistoryBtn" title="Edit history — jump back up to 30 steps, and mark named checkpoints you can return to until the map is reloaded">🕘 History</button>
+      <button id="mapRailPanelBtn" title="List the supply hubs and railways the game loads for your mod, its own and the ones it inherits (the first 80 of each, or those of a state you click) — remove them, change a railway's level (a supply hub has only one), and jump to each. Opens automatically in Hub / Railway mode.">🛤 Rails &amp; supply</button>
+      <button id="mapZoomIn" title="Zoom in — key: + (or scroll up)">＋</button>
+      <button id="mapZoomOut" title="Zoom out — key: − (or scroll down)">－</button>
+      <span id="mapZoomPct" title="Current zoom (100% = the map's native pixels)" style="font-size:12px;color:#8b949e;min-width:46px;display:inline-block;text-align:center;">—</span>
+      <button id="mapResetView" title="Fit the whole map in view — key: 0">Reset view</button>
+      <button id="mapKeysBtn" title="See all keyboard shortcuts — and rebind the tool keys to your own layout">⌨ Keys</button>
+      <button id="mapValidateBtn" title="Check the map for problems (a province in two states, empty states) — and auto-fix the ones that can be fixed">⚠ Map Errors</button>
+      <button id="mapAutoFix" title="Auto-fix: when ON, a state you empty with ↔ Move province or 🧹 Erase is deleted for you (HOI4 will not start a game with an empty state). When OFF, that state is left as it is and you are warned, so you can fill or delete it yourself. Nothing else depends on it.">🛠 Auto-fix: ON</button>
+      <button id="mapExportPng" title="Save the whole map (current colour mode) as a PNG image at native resolution">🖼 Export PNG</button>
+      <button id="mapCountriesBtn" title="Remove a country from the map (auto-handles its capital so the game won't crash) or restore one you removed before">🏳 Countries…</button>
+      <button id="mapGenerateWorld" style="background:#0f3d24; border-color:#3fb950; color:#aff5c4; font-weight:600;" title="Build a whole new world for this mod in one go — Nova makes the map your mod's own, clears the old world, raises new land, repairs it, draws its regions and checks it. Shows what it will do first; takes about 5 minutes for a first world, and 6 to 8 when one is generated again in the same mod.">🌍 Generate a world</button>
+      <button id="mapDeleteMap" title="Delete the ENTIRE map → a blank ocean canvas: turns ALL land into sea and removes every state, so you can build a new world from scratch (e.g. with the land generator). Staged + undoable — nothing is written until you Save." style="background:#3a1416; border-color:#a4332a; color:#ffb3ad;">🗑 Delete map</button>
+      <button id="mapGenerateLand" title="Turns some of the ocean into land and wraps it in states. The land joins the world that is already there; 🌍 Generate a world builds a whole new one. Writes immediately, then checks the map and reloads." style="background:#10301f; border-color:#2ea043; color:#7ee2a8;">🌍 Generate land</button>
+      <button id="mapRedrawRegions" title="Redraw the strategic regions for the land and sea this map has now: land regions built from whole states, sea regions from the sea, and a lake the ocean surrounds made sea. This is what the air map, naval dominance and weather follow. Shows the plan first; writes immediately, then reloads." style="background:#10263a; border-color:#388bfd; color:#a5d6ff;">🗺 Redraw regions</button>
+      <input id="mapFindState" type="search" placeholder="🔎 Find state / country / province" title="Press Enter to jump. Accepts: a state name or id, a country TAG (e.g. GER), or a province (p123 / province 123). Use tag:GER or owner:GER to force a country." autocomplete="off"
+        style="padding:6px 10px; background:#161b22; border:1px solid #30363d; border-radius:4px; color:#c9d1d9; font-size:13px; min-width:190px;" />
+      <span id="mapStatus">Loading…</span>
+      <button id="mapDropStopped" style="display:none; background:#3a1416; border-color:#a4332a; color:#ffb3ad;" title="Take the change this Save stopped at out of the queue: the server refused it, so no Save sends it again. The other changes stay queued, and ↶ Undo puts it back.">✕ Drop the change Save stopped at</button>
+    </div>
+
+    <details class="map-autosave-note">
+      <summary>✋ <b>Nothing is written to your mod until you click 💾 Save changes.</b> — except these, which write into it straight away: <span id="mapWritesAtOnce"><span data-writes="/api/map/world-run">🌍 Generate a world</span>, <span data-writes="/api/map/generate-land">🌍 Generate land</span>, <span data-writes="/api/map/rebuild-regions">🗺 Redraw regions</span>, <span data-writes="/api/map/auto-fix">🔧 Auto-fix all</span> and <span data-writes="/api/map/restore-baseline">🛟 Restore baseline</span> in Map Errors, <span data-writes="/api/map/create-country">✨ New country</span>, <span data-writes="/api/map/delete-country /api/map/restore-country">🏳 Countries… (Remove and Restore)</span>, <span data-writes="/api/map/create-region /api/map/create-supplyarea">✛ a new strategic region or supply area</span>, <span data-writes="/api/map/rivers-clear">🧹 Clear ALL rivers</span> and <span data-writes="/api/army/save">💾 Save army</span></span>. <span class="map-note-more">how saving works</span></summary>
+      <div class="map-note-body">Every other edit — paint owner, move province, terrain, which region or supply area a province or state is in, new/delete state, paint shape — is staged in memory and shown on the map first. Click <b>⚠ Map Errors</b> any time to catch problems (a province in two states, empty states) <b>before</b> you save. Then 💾 Save writes everything to your mod at once (the base game's files are not changed).</div>
+    </details>
+
+    <div id="mapWrap">
+      <canvas id="mapCanvas"></canvas>
+      <div id="mapHud" aria-hidden="true">Hover the map…</div>
+      <div id="mapToolPanel" class="collapsed" role="toolbar" aria-label="Map tools">
+        <button id="mapToolToggle" title="Expand the tool dock to show names">»</button>
+        <button id="mapModeInspect" class="map-tool active" title="Click a state to see its info — shortcut: I (or Esc)"><span class="tool-ico">🔍</span><span class="tool-name">Inspect</span></button>
+        <button id="mapModePaint" class="map-tool" title="Click states to assign them to the selected country — shortcut: B"><span class="tool-ico">🖌</span><span class="tool-name">Paint owner</span></button>
+        <button id="mapModeMove" class="map-tool" title="Click a province, then click a province in the destination state to move it — shortcut: M"><span class="tool-ico">↔</span><span class="tool-name">Move province</span></button>
+        <button id="mapNewState" class="map-tool" title="Create a new empty state, then use Move province to fill it — shortcut: N"><span class="tool-ico">＋</span><span class="tool-name">New state</span></button>
+        <button id="mapModeCapital" class="map-tool" title="Set capital: click a state to make it the CAPITAL of the country that owns it (writes capital = N to its history/countries file), so the country starts on a capital it owns. HOI4 refuses a capital naming a state the map does not have, and Save stops for a country with land left so; a country whose capital is another country's state does not start on it either. Map Errors lists both. In this mode a ★ marks each country's capital where it owns that state (a country with only set_capital lines, at each state they name)."><span class="tool-ico">🏛</span><span class="tool-name">Set capital</span></button>
+        <button id="mapModePaintShape" class="map-tool" title="Reshape provinces: click a province to pick it as the brush, then drag to paint its shape over neighbours. Save when done. — shortcut: R"><span class="tool-ico">🎨</span><span class="tool-name">Paint shape</span></button>
+        <button id="mapModeTerrain" class="map-tool" title="Terrain brush: pick a terrain (plains/forest/hills/mountain/desert/marsh/jungle/urban), then drag over LAND provinces to set their terrain in definition.csv. The game draws ground and trees from the map's pictures, not from that column, so Nova also paints the province's ground in terrain.bmp from the mix the map below paints on that terrain (ground already painted that terrain is left as it is) and grows or clears its trees in trees.bmp, as Generate land does. Urban paints a town of city ground instead and lights it, which is what the game builds a city on; taking urban away takes the town off. Great after Generate land (everything starts as plains). Staged until 💾 Save."><span class="tool-ico">🏔</span><span class="tool-name">Terrain</span></button>
+        <button id="mapModeMeasure" class="map-tool" title="Measure a distance: drag from one point to another to read the pixel length and the provinces/states at each end. Read-only — never edits the map. — shortcut: U"><span class="tool-ico">📏</span><span class="tool-name">Measure</span></button>
+        <button id="mapModeAdjacency" class="map-tool" title="Adjacency: click two provinces to add a strait/canal (sea) or impassable border between them, or remove an existing one. Writes map/adjacencies.csv."><span class="tool-ico">🔗</span><span class="tool-name">Adjacency</span></button>
+        <button id="mapModeSupplyHub" class="map-tool" title="Supply hub: click a province to add a supply hub (click an existing one to remove it). Writes map/supply_nodes.txt."><span class="tool-ico">🏭</span><span class="tool-name">Supply hub</span></button>
+        <button id="mapModeRailway" class="map-tool" title="Railway: click a chain of adjacent provinces, then Finish to lay the rail line. Writes map/railways.txt."><span class="tool-ico">🛤</span><span class="tool-name">Railway</span></button>
+        <button id="mapModeRivers" class="map-tool" title="Rivers: pick a river type, then drag to paint river pixels onto map/rivers.bmp (Erase = land). The overlay shows live."><span class="tool-ico">🌊</span><span class="tool-name">Rivers</span></button>
+        <div class="map-tool-sep" aria-hidden="true" title="World-building / geometry tools"></div>
+        <button id="mapModeErase" class="map-tool" title="Erase land: drag over COASTAL land (land bordering the ocean) to turn whole provinces into sea. INLAND land is skipped — an isolated inland sea/lake has no naval link and crashes HOI4 (loads, then divides by zero). Provinces are kept (never deleted — ids stay valid), just retyped land→sea and dropped from their state. Empty states are handled per 🛠 Auto-fix. Bigger brush = wider erase."><span class="tool-ico">🧹</span><span class="tool-name">Erase</span></button>
+        <!-- TEMPORARILY DISABLED (2026-06-22): Move country scatters province pixels (one-pixel fragments,
+             "pixels spread around the world") and fractures naval strategic regions — fatal damage Auto-fix
+             can't yet repair. Hidden until the pixel-move is made watertight; the backend endpoint also refuses. -->
+        <button id="mapModeMovecountry" class="map-tool" style="display:none" title="Move country is temporarily disabled — it can scatter province pixels and break the map."><span class="tool-ico">🚚</span><span class="tool-name">Move country</span></button>
+        <button id="mapModeNewcountry" class="map-tool" title="New country: drag or click LAND states to claim them, then name the country (tag, name, colour). The capital is auto-picked from the claimed state with the most victory points, and every claimed state becomes the new country's territory. Creates the country files + colours.txt + ownership in one step, written into your mod straight away (not on 💾 Save)."><span class="tool-ico">✨</span><span class="tool-name">New country</span></button>
+        <button id="mapModeArmy" class="map-tool" title="Army: pick a country, choose a division template, then click its provinces to place starting divisions (its Order of Battle). Counters show what's deployed. Save writes history/units + wires oob= into the country. Land units (v1) — existing naval/air are preserved."><span class="tool-ico">🪖</span><span class="tool-name">Army</span></button>
+      </div>
+
+      <!-- ✨ New country: floating bar while claiming territory -->
+      <div id="mapNewCountryBar" style="display:none; position:absolute; top:12px; left:50%; transform:translateX(-50%); z-index:9; align-items:center; gap:10px; background:rgba(13,17,23,0.96); border:1px solid #e954ff66; border-radius:8px; padding:8px 14px; color:#c9d1d9; font-size:13px; box-shadow:0 4px 16px rgba(0,0,0,0.5);">
+        <span style="white-space:nowrap;">✨ New country — <b id="mapNewCountryCount">0</b> state(s) claimed</span>
+        <span id="mapNewCountryPending" style="display:none; white-space:nowrap; color:#e954ff; font-weight:600;"></span>
+        <button id="mapNewCountryCreateBtn" disabled style="background:#8957e5; border:1px solid #a371f7; color:#fff; border-radius:5px; cursor:not-allowed; font-size:12px; padding:4px 11px; font-weight:600; opacity:0.5; white-space:nowrap;">Name &amp; create…</button>
+        <button id="mapNewCountryClearBtn" title="Clear the claim and start over" style="background:#21262d; border:1px solid #30363d; color:#c9d1d9; border-radius:5px; cursor:pointer; font-size:12px; padding:4px 10px; white-space:nowrap;">Clear</button>
+        <button id="mapNewCountryCancelBtn" title="Cancel — leave New country mode" style="background:#21262d; border:1px solid #30363d; color:#c9d1d9; border-radius:5px; cursor:pointer; font-size:12px; padding:4px 10px; white-space:nowrap;">Cancel</button>
+      </div>
+
+      <!-- ✨ Created: the way back to the rest of the country's setup. #country-map-seam -->
+      <div id="mapCountryCreatedBar" style="display:none; position:absolute; top:12px; left:50%; transform:translateX(-50%); z-index:10; align-items:center; gap:10px; background:rgba(13,17,23,0.96); border:1px solid #2ea04366; border-radius:8px; padding:8px 14px; color:#c9d1d9; font-size:13px; box-shadow:0 4px 16px rgba(0,0,0,0.5);">
+        <span style="white-space:nowrap;">✅ Placed on the map.</span>
+        <a id="mapCountryCreatedLink" href="country-setup.html" style="color:#7ee2a8; text-decoration:none; font-weight:600; white-space:nowrap;">Continue setting it up →</a>
+        <button id="mapCountryCreatedDismiss" title="Stay on the Map" style="background:#21262d; border:1px solid #30363d; color:#c9d1d9; border-radius:5px; cursor:pointer; font-size:12px; padding:4px 10px; white-space:nowrap;">Stay here</button>
+      </div>
+
+      <!-- ✨ New country: name + create modal -->
+      <div id="mapNewCountryModal" style="display:none; position:absolute; inset:0; z-index:12; background:rgba(1,4,9,0.6); align-items:center; justify-content:center;">
+        <div style="width:360px; max-width:92%; background:#161b22; border:1px solid #30363d; border-radius:10px; padding:18px; box-shadow:0 8px 32px rgba(0,0,0,0.6);">
+          <h3 style="margin:0 0 4px; font-size:16px; color:#e6edf3;">✨ Create country from claimed territory</h3>
+          <p style="margin:0 0 14px; font-size:12px; color:#8b949e;">Capital (auto, most victory points): <b id="mapNewCountryCapital" style="color:#c9d1d9;">—</b></p>
+          <label style="display:block; font-size:12px; color:#8b949e; margin-bottom:4px; font-weight:600;">Country Tag (3 letters/numbers)</label>
+          <input id="mapNewCountryTag" maxlength="3" placeholder="e.g. ATL" style="width:100%; box-sizing:border-box; padding:7px 10px; margin-bottom:10px; background:#0d1117; border:1px solid #30363d; border-radius:5px; color:#c9d1d9; font-size:13px; text-transform:uppercase;" />
+          <label style="display:block; font-size:12px; color:#8b949e; margin-bottom:4px; font-weight:600;">Country Name</label>
+          <input id="mapNewCountryName" placeholder="e.g. Atlantis" style="width:100%; box-sizing:border-box; padding:7px 10px; margin-bottom:10px; background:#0d1117; border:1px solid #30363d; border-radius:5px; color:#c9d1d9; font-size:13px;" />
+          <label style="display:flex; align-items:center; gap:8px; font-size:12px; color:#8b949e; margin-bottom:6px; font-weight:600;">Map colour
+            <input type="color" id="mapNewCountryColor" value="#8957e5" style="width:40px; height:24px; padding:0; border:1px solid #30363d; border-radius:4px; background:#0d1117; cursor:pointer;" />
+          </label>
+          <div id="mapNewCountryErr" style="color:#ff7b72; font-size:12px; min-height:16px; margin:2px 0 10px;"></div>
+          <div style="display:flex; justify-content:flex-end; gap:8px;">
+            <button id="mapNewCountryModalCancel" style="background:#21262d; border:1px solid #30363d; color:#c9d1d9; border-radius:5px; cursor:pointer; font-size:13px; padding:7px 14px;">Cancel</button>
+            <button id="mapNewCountrySubmit" style="background:#238636; border:1px solid #2ea043; color:#fff; border-radius:5px; cursor:pointer; font-size:13px; padding:7px 16px; font-weight:600;">Create country</button>
+          </div>
+        </div>
+      </div>
+      <div id="mapHistoryPanel" style="display:none; position:absolute; top:12px; left:60px; z-index:7; width:248px; max-height:72%; overflow:auto; background:rgba(13,17,23,0.95); border:1px solid #30363d; border-radius:8px; padding:10px; color:#c9d1d9; font-size:12px; box-shadow:0 4px 16px rgba(0,0,0,0.5);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+          <b>🕘 History</b>
+          <button id="mapHistoryClose" title="Close" style="background:transparent; border:1px solid #30363d; color:#c9d1d9; border-radius:4px; cursor:pointer; padding:1px 7px;">✕</button>
+        </div>
+        <div style="color:#6e7681; margin-bottom:5px;">Click any step to jump back (or forward) — it keeps the last 30 steps. Edits aren't saved until you click 💾.</div>
+        <div id="mapHistoryList" style="display:flex; flex-direction:column; gap:1px;"></div>
+        <div style="border-top:1px solid #30363d; margin:9px 0 7px;"></div>
+        <div style="font-weight:600; margin-bottom:4px;">📌 Checkpoints</div>
+        <div style="display:flex; gap:5px; margin-bottom:6px;">
+          <input id="mapCheckpointName" type="text" placeholder="Name this checkpoint…" style="flex:1; min-width:0; box-sizing:border-box; padding:4px 6px; background:#161b22; border:1px solid #30363d; border-radius:4px; color:#c9d1d9; font-size:11px;" />
+          <button id="mapCheckpointAdd" title="Mark the current map as a named snapshot you can restore until the map is reloaded (reloading the page, or a tool that reads the map back, drops checkpoints)" style="background:#21262d; border:1px solid #30363d; color:#c9d1d9; border-radius:4px; cursor:pointer; font-size:11px; padding:2px 8px; white-space:nowrap;">Mark</button>
+        </div>
+        <div id="mapCheckpointList"></div>
+      </div>
+      <div id="mapMultiBar" style="display:none; position:absolute; bottom:12px; left:50%; transform:translateX(-50%); z-index:8; align-items:center; flex-wrap:wrap; justify-content:center; gap:7px; max-width:92%; background:rgba(13,17,23,0.96); border:1px solid #39d0ff; border-radius:8px; padding:7px 12px; color:#c9d1d9; font-size:12px; box-shadow:0 4px 16px rgba(0,0,0,0.55);">
+        <span style="white-space:nowrap;">🔲 <b id="mapMultiCount">0</b> selected</span>
+        <button id="mapMultiSimilar" title="Add every state with the same owner as the current selection" style="background:#21262d; border:1px solid #30363d; color:#c9d1d9; border-radius:4px; cursor:pointer; font-size:11px; padding:3px 8px; white-space:nowrap;">+ same owner</button>
+        <button id="mapMultiRegion" title="Add every state in the same strategic region as the current selection" style="background:#21262d; border:1px solid #30363d; color:#c9d1d9; border-radius:4px; cursor:pointer; font-size:11px; padding:3px 8px; white-space:nowrap;">+ same region</button>
+        <button id="mapMultiSetOwner" title="Set the owner of all selected states to the Paint country (above)" style="background:#238636; border:1px solid #2ea043; color:#fff; border-radius:4px; cursor:pointer; font-size:11px; padding:3px 9px; font-weight:600; white-space:nowrap;">Set owner → Paint country</button>
+        <select id="mapMultiCategory" title="State category to apply to all selected" style="background:#161b22; border:1px solid #30363d; border-radius:4px; color:#c9d1d9; font-size:11px; padding:2px 4px;"><option value="">— category —</option></select>
+        <button id="mapMultiSetCategory" title="Set the category of all selected states" style="background:#21262d; border:1px solid #30363d; color:#c9d1d9; border-radius:4px; cursor:pointer; font-size:11px; padding:3px 8px; white-space:nowrap;">Set category</button>
+        <input id="mapMultiManpower" type="number" min="0" placeholder="population" title="Population to apply to all selected" style="width:84px; background:#161b22; border:1px solid #30363d; border-radius:4px; color:#c9d1d9; font-size:11px; padding:2px 6px;" />
+        <button id="mapMultiSetManpower" title="Set the population of all selected states" style="background:#21262d; border:1px solid #30363d; color:#c9d1d9; border-radius:4px; cursor:pointer; font-size:11px; padding:3px 8px; white-space:nowrap;">Set pop.</button>
+        <button id="mapMultiClear" title="Clear the selection" style="background:#21262d; border:1px solid #30363d; color:#c9d1d9; border-radius:4px; cursor:pointer; font-size:11px; padding:3px 8px;">Clear</button>
+      </div>
+      <div id="mapAdjPanel" style="display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); z-index:9; width:300px; background:rgba(13,17,23,0.98); border:1px solid #39d0ff; border-radius:8px; padding:12px 14px; color:#c9d1d9; font-size:12px; box-shadow:0 8px 28px rgba(0,0,0,0.6);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <b id="mapAdjTitle">🔗 Adjacency</b>
+          <button id="mapAdjCancel" title="Cancel" style="background:transparent; border:1px solid #30363d; color:#c9d1d9; border-radius:4px; cursor:pointer; padding:1px 7px;">✕</button>
+        </div>
+        <div style="color:#8b949e; line-height:1.5; margin-bottom:9px;">An <b style="color:#c9d1d9;">adjacency</b> connects two provinces in a way the map shapes don't already show. Pick what kind:</div>
+        <div id="mapAdjExisting" style="display:none; color:#d29922; margin-bottom:8px;"></div>
+        <input type="hidden" id="mapAdjType" value="impassable" />
+        <div style="display:flex; flex-direction:column; gap:7px; margin-bottom:9px;">
+          <button type="button" class="adj-card" data-adj-type="impassable">
+            <div class="adj-card-t">🚫 Impassable border</div>
+            <div class="adj-card-d">Block all movement between these two provinces even though they touch — e.g. an uncrossable mountain wall or a sealed border.</div>
+          </button>
+          <button type="button" class="adj-card" data-adj-type="sea">
+            <div class="adj-card-t">🌊 Sea strait / canal</div>
+            <div class="adj-card-d">A strait lets land units cross between two land provinces through a sea one; a canal lets ships cross between two sea provinces through a land one, as Suez, Kiel and Panama do. Needs the province they pass through (below).</div>
+          </button>
+          <button type="button" class="adj-card" data-adj-type="">
+            <div class="adj-card-t">🔗 Plain link (no type)</div>
+            <div class="adj-card-d">Leaves the Type column empty. The base game writes its rule-controlled sea passages this way — Gibraltar, the Bosphorus, the Dardanelles, Hormuz — between two sea zones; some mods use it for island crossings, with a province to pass through (below, optional). An existing link keeps its adjacency rule.</div>
+          </button>
+        </div>
+        <div id="mapAdjThroughRow" style="display:none; align-items:center; gap:6px; margin-bottom:9px;">
+          <span style="white-space:nowrap;">Crossing via province</span>
+          <input id="mapAdjThrough" type="number" min="0" placeholder="province id" title="The province the crossing passes through — a sea province for a strait, a land one for a canal (vanilla's only three are Suez, Kiel and Panama). Tip: click a province to read its id in the bottom-left HUD." style="flex:1; min-width:0; padding:4px 6px; background:#161b22; border:1px solid #30363d; border-radius:4px; color:#c9d1d9;" />
+        </div>
+        <div style="display:flex; gap:8px; justify-content:flex-end;">
+          <button id="mapAdjRemove" style="display:none; background:#6e2730; border:1px solid #8e3640; color:#fff; border-radius:4px; cursor:pointer; padding:4px 10px;">Remove existing</button>
+          <button id="mapAdjAdd" style="background:#238636; border:1px solid #2ea043; color:#fff; border-radius:4px; cursor:pointer; padding:4px 12px; font-weight:600;">Add link</button>
+        </div>
+      </div>
+      <div id="mapRailBar" style="display:none; position:absolute; bottom:12px; left:50%; transform:translateX(-50%); z-index:8; align-items:center; gap:10px; background:rgba(13,17,23,0.96); border:1px solid #ffd24a; border-radius:8px; padding:7px 12px; color:#c9d1d9; font-size:12px; box-shadow:0 4px 16px rgba(0,0,0,0.55);">
+        <span>🛤 Railway: <b id="mapRailCount">0</b> provinces <span style="color:#6e7681;">(click more to extend)</span></span>
+        <button id="mapRailFinish" title="Lay the railway across the clicked provinces" style="background:#238636; border:1px solid #2ea043; color:#fff; border-radius:4px; cursor:pointer; font-size:11px; padding:3px 10px; font-weight:600; white-space:nowrap;">Finish railway</button>
+        <button id="mapRailCancel" title="Discard the in-progress railway" style="background:#21262d; border:1px solid #30363d; color:#c9d1d9; border-radius:4px; cursor:pointer; font-size:11px; padding:3px 10px;">Cancel</button>
+      </div>
+      <div id="mapRailPanel" style="display:none; position:absolute; top:12px; right:12px; z-index:9; width:272px; max-height:80%; overflow:auto; overscroll-behavior:contain; background:rgba(13,17,23,0.97); border:1px solid #ffd24a; border-radius:8px; padding:10px; color:#c9d1d9; font-size:12px; box-shadow:0 6px 22px rgba(0,0,0,0.6);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+          <b>🛤 Railways &amp; supply</b>
+          <button id="mapRailPanelClose" title="Close" style="background:transparent; border:1px solid #30363d; color:#c9d1d9; border-radius:4px; cursor:pointer; padding:1px 7px;">✕</button>
+        </div>
+        <div id="mapRailPanelSummary" style="color:#8b949e; margin-bottom:8px;"></div>
+        <div id="mapRailPanelBody" style="display:flex; flex-direction:column; gap:6px;"></div>
+      </div>
+      <div id="mapKeysOverlay" style="display:none; position:absolute; inset:0; z-index:20; background:rgba(1,4,9,0.66); align-items:flex-start; justify-content:center;">
+        <div id="mapKeysModal" style="margin-top:4%; width:430px; max-width:92%; max-height:88%; overflow:auto; background:#0d1117; border:1px solid #39d0ff; border-radius:10px; padding:14px 16px; color:#c9d1d9; font-size:12px; box-shadow:0 12px 44px rgba(0,0,0,0.7);">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <b style="font-size:14px;">⌨ Keyboard shortcuts</b>
+            <button id="mapKeysClose" title="Close" style="background:transparent; border:1px solid #30363d; color:#c9d1d9; border-radius:4px; cursor:pointer; padding:1px 8px;">✕</button>
+          </div>
+          <div style="color:#8b949e; margin-bottom:10px; line-height:1.5;">Click a tool's key, then press the key you want — rebind the tools to your own layout. Saved on this computer.</div>
+          <div style="font-weight:600; color:#39d0ff; margin-bottom:4px;">Tools <span style="color:#6e7681; font-weight:normal;">(click a key to change)</span></div>
+          <div id="mapKeysToolList" style="display:flex; flex-direction:column; gap:2px; margin-bottom:13px;"></div>
+          <div style="font-weight:600; color:#8b949e; margin-bottom:4px;">View &amp; editing <span style="color:#6e7681; font-weight:normal;">(fixed)</span></div>
+          <div style="line-height:1.95;">
+            <div class="map-keys-row"><span>Pan the view</span><span><span class="kbd">←</span> <span class="kbd">↑</span> <span class="kbd">→</span> <span class="kbd">↓</span> <span style="color:#6e7681;">(Shift = faster)</span></span></div>
+            <div class="map-keys-row"><span>Hand-pan from any tool</span><span>hold <span class="kbd">Space</span> + drag</span></div>
+            <div class="map-keys-row"><span>Zoom in / out</span><span><span class="kbd">+</span> <span class="kbd">−</span> <span style="color:#6e7681;">(or scroll)</span></span></div>
+            <div class="map-keys-row"><span>Fit map to view</span><span><span class="kbd">0</span></span></div>
+            <div class="map-keys-row"><span>Smaller / bigger brush</span><span><span class="kbd">[</span> <span class="kbd">]</span></span></div>
+            <div class="map-keys-row"><span>Back to Inspect</span><span><span class="kbd">Esc</span></span></div>
+            <div class="map-keys-row"><span>Save / Undo / Redo</span><span><span class="kbd">Ctrl+S</span> <span class="kbd">Ctrl+Z</span> <span class="kbd">Ctrl+Y</span></span></div>
+            <div class="map-keys-row" id="mapKeysFieldNote"><span style="color:#6e7681;">In a text field, Ctrl+S still saves; Ctrl+Z and Ctrl+Y undo and redo your typing there, not the map.</span></div>
+          </div>
+          <div style="display:flex; justify-content:flex-end; margin-top:13px;">
+            <button id="mapKeysReset" title="Put every tool back on its default key" style="background:#21262d; border:1px solid #30363d; color:#c9d1d9; border-radius:4px; cursor:pointer; font-size:11px; padding:4px 10px;">Reset tool keys to defaults</button>
+          </div>
+        </div>
+      </div>
+      <div id="mapRiversPalette" style="display:none; position:absolute; bottom:12px; left:50%; transform:translateX(-50%); z-index:8; align-items:center; gap:8px; flex-wrap:wrap; justify-content:center; max-width:92%; background:rgba(13,17,23,0.96); border:1px solid #39d0ff; border-radius:8px; padding:7px 12px; color:#c9d1d9; font-size:12px; box-shadow:0 4px 16px rgba(0,0,0,0.55);">
+        <span style="white-space:nowrap;">🌊 Paint:</span>
+        <span id="mapRiversSwatches" style="display:flex; gap:5px; align-items:center; flex-wrap:wrap;"></span>
+        <span style="color:#6e7681; white-space:nowrap;">drag on the map</span>
+        <button id="mapRiversClear" type="button" title="Erase EVERY river on the whole map back to land in one click — the escape hatch for a botched or giant river. Writes immediately; Nova backs your current rivers.bmp up to its own backups folder first." style="white-space:nowrap; background:#3a1416; border:1px solid #a4332a; color:#ffb3ad; border-radius:5px; cursor:pointer; padding:2px 8px; font-size:11px;">🧹 Clear ALL rivers</button>
+        <span style="flex-basis:100%; color:#8b949e; font-size:10.5px; text-align:center; line-height:1.35;">🟢 source (place <b style="color:#aeb7c2;">one</b> per river) · 🔴 joins in · 🟡 branches · <b style="color:#aeb7c2;">Small/Large</b> = the river's WIDTH. The line stays <b style="color:#aeb7c2;">1px</b> wide — a giant river is just the <b style="color:#aeb7c2;">Large ▇</b> colour, never a thick band. <b style="color:#aeb7c2;">Drag</b> to draw the path.</span>
+      </div>
+      <div id="mapTerrainPalette" style="display:none; position:absolute; bottom:12px; left:50%; transform:translateX(-50%); z-index:8; align-items:center; gap:8px; flex-wrap:wrap; justify-content:center; max-width:92%; background:rgba(13,17,23,0.96); border:1px solid #9ca35e; border-radius:8px; padding:7px 12px; color:#c9d1d9; font-size:12px; box-shadow:0 4px 16px rgba(0,0,0,0.55);">
+        <span style="white-space:nowrap;">🏔 Terrain:</span>
+        <span id="mapTerrainSwatches" style="display:flex; gap:5px; align-items:center; flex-wrap:wrap;"></span>
+        <span style="color:#6e7681; white-space:nowrap;">drag over land</span>
+      </div>
+      <div id="mapBlankConfirm" style="display:none; position:absolute; inset:0; z-index:20; background:rgba(2,4,8,0.72); align-items:center; justify-content:center;">
+        <!-- ⛔ #a-dialog-that-outgrows-its-panel-loses-its-own-button. This card had no height limit, and the
+             overlay is `inset:0` on the MAP PANEL (620px tall in the app's own 1440x920 window), not the page.
+             A card taller than that is clipped at BOTH ends by the centring flexbox, and the page does not
+             scroll — so "Delete the map", Cancel and the typed-DELETE box simply go out of reach, with nothing
+             to say why. Measured on 4601d18 the body was 353px and the card 543px, which fitted with 77px to
+             spare; one paragraph of extra truth took the card to 801px and the confirm button off-screen.
+             The body now scrolls INSIDE a card that cannot outgrow its panel, so the dialog's copy can grow
+             again without taking its own controls with it. -->
+        <div style="width:min(440px,86%); max-height:100%; box-sizing:border-box; display:flex; flex-direction:column; background:#161b22; border:1px solid #a4332a; border-radius:10px; padding:18px 20px; color:#e6edf3; box-shadow:0 8px 32px rgba(0,0,0,0.6);">
+          <div style="font-size:16px; font-weight:700; color:#ffb3ad; margin-bottom:8px;">🗑 Delete the entire map?</div>
+          <!-- Filled at open time from the loaded map: on a mod that does not replace history/states this
+               cannot produce a blank canvas, and saying so is the whole point. See blankConfirmBody(). -->
+          <div id="mapBlankBody" style="font-size:13px; line-height:1.5; color:#c9d1d9; overflow-y:auto; min-height:0;">This turns <b>ALL land into sea</b> and deletes every state file <b>your mod owns</b> — the province shapes &amp; strategic regions are kept.<br><br>It's <b>staged and undoable</b> — nothing is written to your mod until you click 💾 Save, and ↶ Undo reverts it.</div>
+          <div id="mapBlankTypeRow" style="margin-top:14px; font-size:12px; color:#8b949e;">Type <b style="color:#ffb3ad;">DELETE</b> to confirm:</div>
+          <input id="mapBlankInput" type="text" autocomplete="off" placeholder="DELETE" style="margin-top:6px; width:100%; box-sizing:border-box; padding:7px 10px; background:#0d1117; border:1px solid #30363d; border-radius:6px; color:#e6edf3; font-size:14px; letter-spacing:1px;" />
+          <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:14px;">
+            <button id="mapBlankCancel" style="padding:7px 14px; background:#21262d; border:1px solid #30363d; border-radius:6px; color:#c9d1d9; cursor:pointer; font-size:13px;">Cancel</button>
+            <button id="mapBlankConfirmBtn" disabled style="padding:7px 14px; background:#5a1d1a; border:1px solid #a4332a; border-radius:6px; color:#ffb3ad; cursor:not-allowed; font-weight:600; font-size:13px; opacity:0.6;">Delete the map</button>
+          </div>
+        </div>
+      </div>
+      <div id="mapGenConfirm" style="display:none; position:absolute; inset:0; z-index:20; background:rgba(2,4,8,0.72); align-items:center; justify-content:center;">
+        <div style="width:min(440px,86%); background:#161b22; border:1px solid #2ea043; border-radius:10px; padding:18px 20px; color:#e6edf3; box-shadow:0 8px 32px rgba(0,0,0,0.6);">
+          <div style="font-size:16px; font-weight:700; color:#7ee2a8; margin-bottom:8px;">🌍 Generate land</div>
+          <div style="font-size:13px; line-height:1.5; color:#c9d1d9;">Turns part of the ocean into land and wraps it in states. The land it raises joins the world that is already there: for a whole new world, use <b>🌍 Generate a world</b> instead. This writes to your mod <b>immediately</b>, then checks the map the way 💾 Save does and reloads.</div>
+          <div id="mapGenWarn" style="display:none; margin-top:11px; background:#3d1418; border:1px solid #f85149; border-radius:6px; padding:9px 11px; font-size:12.5px; line-height:1.5; color:#ffd7d5;">⚠ This map already has <b id="mapGenLandCount">0</b> land provinces. Generate land is meant for a <b>blank ocean canvas</b> — running it on a populated map (like Millennium Dawn) adds land into the seas and spins up many new states, which can leave the map a mess. For a whole new world, use <b>🌍 Generate a world</b> instead: it clears the old world first. To proceed anyway, type <b>GENERATE</b> below.</div>
+          <div id="mapGenShapes" style="display:none; margin-top:11px; background:#3a2d12; border:1px solid #d29922; border-radius:6px; padding:9px 11px; font-size:12.5px; line-height:1.5; color:#ffe2b0;"></div>
+          <div id="mapGenConfirmRow" style="display:none; margin-top:10px;"><input id="mapGenConfirmInput" placeholder="Type GENERATE to confirm" autocomplete="off" style="width:100%; box-sizing:border-box; padding:6px 10px; background:#0d1117; border:1px solid #f85149; border-radius:6px; color:#e6edf3; font-size:13px;" /></div>
+          <div style="display:flex; gap:14px; margin-top:14px; flex-wrap:wrap;">
+            <label style="font-size:12px; color:#8b949e;">Land amount: <b id="mapGenPctLabel" style="color:#7ee2a8;">35%</b><br><input id="mapGenPct" type="range" min="1" max="90" value="35" style="width:150px; margin-top:4px;" /></label>
+            <label style="font-size:12px; color:#8b949e;">Seed<br><input id="mapGenSeed" type="number" value="1" style="margin-top:4px; width:90px; box-sizing:border-box; padding:5px 8px; background:#0d1117; border:1px solid #30363d; border-radius:6px; color:#e6edf3; font-size:13px;" /></label>
+            <label style="font-size:12px; color:#8b949e;">Who owns it<br><select id="mapGenOwnerMode" style="margin-top:4px; width:190px; box-sizing:border-box; padding:5px 8px; background:#0d1117; border:1px solid #30363d; border-radius:6px; color:#e6edf3; font-size:13px;"><option value="inherit" selected>The countries below it</option><option value="single">One country…</option><option value="none">Nobody</option></select></label>
+            <label id="mapGenOwnerTagRow" style="display:none; font-size:12px; color:#8b949e;">Country tag<br><input id="mapGenOwnerTag" placeholder="GER" autocomplete="off" maxlength="8" style="margin-top:4px; width:90px; box-sizing:border-box; padding:5px 8px; background:#0d1117; border:1px solid #30363d; border-radius:6px; color:#e6edf3; font-size:13px; text-transform:uppercase;" /></label>
+          </div>
+          <div id="mapGenOwnerNote" style="margin-top:9px; font-size:12px; line-height:1.5; color:#8b949e;"></div>
+          <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:16px;">
+            <button id="mapGenCancel" style="padding:7px 14px; background:#21262d; border:1px solid #30363d; border-radius:6px; color:#c9d1d9; cursor:pointer; font-size:13px;">Cancel</button>
+            <button id="mapGenConfirmBtn" style="padding:7px 14px; background:#176f3a; border:1px solid #2ea043; border-radius:6px; color:#d7ffe6; cursor:pointer; font-weight:600; font-size:13px;">Generate</button>
+          </div>
+        </div>
+      </div>
+      <!-- 🌍 Generate a world's confirm: the Generate land dialog's own controls under their own ids, and the plan of all six steps
+           (worldConfirmBody in map.js). The body scrolls inside a card that cannot outgrow its panel, as #mapBlankConfirm's does
+           (#a-dialog-that-outgrows-its-panel-loses-its-own-button). -->
+      <div id="mapWorldConfirm" style="display:none; position:absolute; inset:0; z-index:20; background:rgba(2,4,8,0.72); align-items:center; justify-content:center;">
+        <div style="width:min(560px,90%); max-height:100%; box-sizing:border-box; display:flex; flex-direction:column; background:#161b22; border:1px solid #3fb950; border-radius:10px; padding:18px 20px; color:#e6edf3; box-shadow:0 8px 32px rgba(0,0,0,0.6);">
+          <div style="font-size:16px; font-weight:700; color:#7ee2a8; margin-bottom:8px;">🌍 Generate a world</div>
+          <div style="overflow-y:auto; min-height:0;">
+            <div id="mapWorldPlan" style="font-size:13px; line-height:1.5; color:#c9d1d9;"></div>
+            <div style="display:flex; gap:14px; margin-top:14px; flex-wrap:wrap; align-items:flex-end;">
+              <label style="font-size:12px; color:#8b949e;">Land amount: <b id="mapWorldPctLabel" style="color:#7ee2a8;">35%</b><br><input id="mapWorldPct" type="range" min="1" max="90" value="35" style="width:150px; margin-top:4px;" /></label>
+              <label style="font-size:12px; color:#8b949e;">Seed<br><input id="mapWorldSeed" type="number" value="1" style="margin-top:4px; width:110px; box-sizing:border-box; padding:5px 8px; background:#0d1117; border:1px solid #30363d; border-radius:6px; color:#e6edf3; font-size:13px;" /></label>
+              <button id="mapWorldNewSeed" type="button" style="padding:5px 10px; background:#21262d; border:1px solid #30363d; border-radius:6px; color:#c9d1d9; cursor:pointer; font-size:12px;">🎲 New seed</button>
+              <label style="font-size:12px; color:#8b949e;">Who owns it<br><select id="mapWorldOwnerMode" style="margin-top:4px; width:190px; box-sizing:border-box; padding:5px 8px; background:#0d1117; border:1px solid #30363d; border-radius:6px; color:#e6edf3; font-size:13px;"><option value="inherit" selected>The countries below it</option><option value="single">One country…</option><option value="none">Nobody</option></select></label>
+              <label id="mapWorldOwnerTagRow" style="display:none; font-size:12px; color:#8b949e;">Country tag<br><input id="mapWorldOwnerTag" placeholder="GER" autocomplete="off" maxlength="8" style="margin-top:4px; width:90px; box-sizing:border-box; padding:5px 8px; background:#0d1117; border:1px solid #30363d; border-radius:6px; color:#e6edf3; font-size:13px; text-transform:uppercase;" /></label>
+            </div>
+            <div style="margin-top:6px; font-size:11.5px; color:#6e7681;">The same land amount, seed and owners on the same starting map give the same world.</div>
+            <div id="mapWorldOwnerNote" style="margin-top:9px; font-size:12px; line-height:1.5; color:#8b949e;"></div>
+            <div id="mapWorldConfirmRow" style="display:none; margin-top:12px;">
+              <div id="mapWorldConfirmText" style="font-size:12.5px; line-height:1.5; color:#ffd7d5;"></div>
+              <input id="mapWorldConfirmInput" placeholder="GENERATE" autocomplete="off" style="margin-top:6px; width:100%; box-sizing:border-box; padding:6px 10px; background:#0d1117; border:1px solid #f85149; border-radius:6px; color:#e6edf3; font-size:13px; letter-spacing:1px;" />
+            </div>
+          </div>
+          <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:16px;">
+            <button id="mapWorldCancel" style="padding:7px 14px; background:#21262d; border:1px solid #30363d; border-radius:6px; color:#c9d1d9; cursor:pointer; font-size:13px;">Cancel</button>
+            <button id="mapWorldGo" style="padding:7px 14px; background:#176f3a; border:1px solid #2ea043; border-radius:6px; color:#d7ffe6; cursor:pointer; font-weight:600; font-size:13px;">🌍 Generate the world</button>
+          </div>
+        </div>
+      </div>
+      <div id="mapRedrawConfirm" style="display:none; position:absolute; inset:0; z-index:20; background:rgba(2,4,8,0.72); align-items:center; justify-content:center;">
+        <div style="width:min(480px,88%); max-height:92%; overflow-y:auto; box-sizing:border-box; background:#161b22; border:1px solid #388bfd; border-radius:10px; padding:18px 20px; color:#e6edf3; box-shadow:0 8px 32px rgba(0,0,0,0.6);">
+          <div style="font-size:16px; font-weight:700; color:#a5d6ff; margin-bottom:8px;">🗺 Redraw strategic regions</div>
+          <div id="mapRedrawBody" style="font-size:13px; line-height:1.5; color:#c9d1d9;"></div>
+          <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:16px;">
+            <button id="mapRedrawCancel" style="padding:7px 14px; background:#21262d; border:1px solid #30363d; border-radius:6px; color:#c9d1d9; cursor:pointer; font-size:13px;">Cancel</button>
+            <button id="mapRedrawConfirmBtn" style="padding:7px 14px; background:#1f4f8f; border:1px solid #388bfd; border-radius:6px; color:#dbeaff; cursor:pointer; font-weight:600; font-size:13px;">Redraw</button>
+          </div>
+        </div>
+      </div>
+      <div id="mapMoveCountryConfirm" style="display:none; position:absolute; inset:0; z-index:20; background:rgba(2,4,8,0.72); align-items:center; justify-content:center;">
+        <div style="width:min(460px,88%); background:#161b22; border:1px solid #d29922; border-radius:10px; padding:18px 20px; color:#e6edf3; box-shadow:0 8px 32px rgba(0,0,0,0.6);">
+          <div style="font-size:16px; font-weight:700; color:#ffd7a8; margin-bottom:8px;">🚚 Move country — ⚠ experimental</div>
+          <div id="mapMoveCountryMsg" style="font-size:13px; line-height:1.5; color:#c9d1d9;"></div>
+          <div style="margin-top:10px; font-size:12px; line-height:1.5; color:#d29922;">This physically moves the country's province shapes on the bitmap and <b>overwrites whatever is at the destination</b> — provinces it covers can be left broken (under 8px / 0px), which HOI4 may refuse to load. It writes <b>immediately</b> (not staged). Province shapes can't be cleanly relocated in HOI4 — that's why this is experimental.</div>
+          <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:16px;">
+            <button id="mapMoveCountryCancel" style="padding:7px 14px; background:#21262d; border:1px solid #30363d; border-radius:6px; color:#c9d1d9; cursor:pointer; font-size:13px;">Cancel</button>
+            <button id="mapMoveCountryConfirmBtn" style="padding:7px 14px; background:#7a5b12; border:1px solid #d29922; border-radius:6px; color:#ffe9c2; cursor:pointer; font-weight:600; font-size:13px;">Move it anyway</button>
+          </div>
+        </div>
+      </div>
+      <div id="mapAutofixWarn" style="display:none; position:absolute; inset:0; z-index:20; background:rgba(2,4,8,0.72); align-items:center; justify-content:center;">
+        <div style="width:min(460px,88%); background:#161b22; border:1px solid #d29922; border-radius:10px; padding:18px 20px; color:#e6edf3; box-shadow:0 8px 32px rgba(0,0,0,0.6);">
+          <div style="font-size:16px; font-weight:700; color:#ffd7a8; margin-bottom:8px;">⚠ Turn off Auto-fix?</div>
+          <div style="font-size:13px; line-height:1.5; color:#c9d1d9;">Auto-fix decides one thing: what happens to a state you empty with ↔ Move province or 🧹 Erase. With it ON, the editor deletes that state for you — HOI4 will not start a game with a state that has no provinces.</div>
+          <div style="margin-top:10px; font-size:12px; line-height:1.5; color:#d29922;">With it <b>OFF</b>, an emptied state is left as it is and the editor only warns you: you'll have to ↶ Undo the edit that emptied it, or after 💾 Save use ⚠ Map Errors' 🔧 Auto-fix all, before the mod will load. Everything else works the same either way — a Move still takes a coast's dockyards with its last coastal province, a Move still asks whether to keep the state in one strategic region, and 💾 Save still drops a new state nothing was put in.</div>
+          <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:16px;">
+            <button id="mapAutofixWarnCancel" style="padding:7px 14px; background:#176f3a; border:1px solid #2ea043; border-radius:6px; color:#d7ffe6; cursor:pointer; font-weight:600; font-size:13px;">Keep Auto-fix ON</button>
+            <button id="mapAutofixWarnConfirm" style="padding:7px 14px; background:#7a5b12; border:1px solid #d29922; border-radius:6px; color:#ffe9c2; cursor:pointer; font-size:13px;">Turn it off anyway</button>
+          </div>
+        </div>
+      </div>
+      <div id="mapLegend" aria-hidden="true" style="display:none; position:absolute; right:272px; bottom:12px; z-index:6; background:rgba(13,17,23,0.86); border:1px solid #30363d; border-radius:6px; padding:8px 10px; color:#c9d1d9; font-size:11px; pointer-events:none; box-shadow:0 2px 8px rgba(0,0,0,0.4);">
+        <div id="mapLegendTitle" style="font-weight:600; margin-bottom:5px;">Heatmap</div>
+        <div id="mapLegendBar" style="width:160px; height:10px; border-radius:3px; border:1px solid #0008; background:linear-gradient(to right, hsl(220,70%,45%), hsl(170,70%,45%), hsl(90,75%,48%), hsl(45,90%,52%), hsl(0,80%,52%));"></div>
+        <div style="display:flex; justify-content:space-between; margin-top:3px;"><span id="mapLegendMin">0</span><span id="mapLegendMax">—</span></div>
+      </div>
+      <canvas id="mapMinimap" title="Overview — click to jump there"></canvas>
+      <button id="mapInfoShow" title="Show the info / edit panel">ℹ Panel</button>
+
+      <!-- 🪖 Army / Order of Battle panel -->
+      <div id="mapArmyPanel" style="display:none; position:absolute; top:10px; left:10px; width:272px; background:rgba(13,17,23,0.96); border:1px solid #30363d; border-radius:10px; padding:12px 14px; color:#c9d1d9; font-size:12px; z-index:8; box-shadow:0 6px 24px rgba(0,0,0,0.5); max-height:calc(100% - 20px); overflow:auto;">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+          <h3 style="margin:0; font-size:14px; color:#f0f6fc;">🪖 Army</h3>
+          <button id="armyPanelMin" title="Leave Army mode" style="background:transparent;border:none;color:#8b949e;cursor:pointer;font-size:16px;line-height:1;">×</button>
+        </div>
+        <div style="margin-bottom:8px;">
+          <div style="color:#8b949e; margin-bottom:3px;">Country</div>
+          <div style="display:flex; gap:6px; align-items:center;">
+            <b id="armyCountryTag" style="color:#58a6ff; font-size:15px;">— click a country —</b>
+            <button id="armyChangeCountry" title="Pick a different country (or Alt+click one on the map)" style="margin-left:auto; background:#21262d;border:1px solid #30363d;color:#c9d1d9;border-radius:5px;cursor:pointer;font-size:11px;padding:2px 8px;">change</button>
+          </div>
+        </div>
+        <div id="armyBody" style="display:none;">
+          <div style="color:#8b949e; margin:6px 0 3px;">Division template</div>
+          <div id="armyTemplateList" style="display:flex; flex-direction:column; gap:4px; max-height:170px; overflow:auto;"></div>
+          <button id="armyAddPreset" style="margin-top:6px; width:100%; background:#1f2937;border:1px dashed #4b5563;color:#9ca3af;border-radius:6px;cursor:pointer;font-size:11px;padding:6px;">＋ Add a template from a preset</button>
+          <div id="armyPresetPicker" style="display:none; margin-top:6px; flex-direction:column; gap:3px;"></div>
+          <div style="display:flex; gap:6px; margin-top:10px;">
+            <button id="armyPlaceMode" class="army-mode-btn active" type="button">🪖 Place</button>
+            <button id="armyRemoveMode" class="army-mode-btn" type="button">🗑 Remove</button>
+          </div>
+          <div style="margin-top:8px; color:#8b949e;">Deployed: <b id="armyDivCount" style="color:#c9d1d9;">0</b> division(s)</div>
+          <div id="armyHint" style="margin-top:6px; color:#6e7681; line-height:1.4; font-size:11px;">Pick a template, then click this country's provinces to place divisions.</div>
+          <button id="armySaveBtn" type="button" style="margin-top:10px; width:100%; background:#238636;border:1px solid #2ea043;color:#fff;font-weight:700;border-radius:6px;cursor:pointer;font-size:13px;padding:9px;">💾 Save army</button>
+          <div id="armySaveStatus" style="margin-top:6px; font-size:11px; line-height:1.4;"></div>
+        </div>
+      </div>
+
+      <!-- 🏳 Country card (#country-card): what the game gives a country on day one, and a way into each maker for it -->
+      <div id="mapCountryCard" role="dialog" aria-labelledby="ctyCardTitle">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <img id="ctyCardFlag" alt="" width="41" height="26" style="border:1px solid #30363d; border-radius:2px; object-fit:cover; background:#161b22;" />
+          <div style="min-width:0; flex:1;">
+            <h3 id="ctyCardTitle" style="margin:0; font-size:15px; color:#f0f6fc; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">—</h3>
+            <div id="ctyCardTag" class="cc-note" style="font-variant-numeric:tabular-nums;"></div>
+          </div>
+          <button id="ctyCardClose" title="Close the country card" aria-label="Close" style="background:transparent;border:none;color:#8b949e;cursor:pointer;font-size:16px;line-height:1;align-self:flex-start;">×</button>
+        </div>
+        <div id="ctyCardBody"></div>
+        <div class="cc-links">
+          <button type="button" data-cc-open="focus" title="Open the focus tree the game gives this country in the focus editor">🎯 Focus tree</button>
+          <button type="button" data-cc-open="research" title="Open Research with this country's starting technologies">🔬 Research</button>
+          <button type="button" data-cc-open="setup" title="Open Country Setup for this country: laws, spirits, politics, leaders">⚖ Laws &amp; setup</button>
+          <button type="button" data-cc-open="army" title="Open the Army maker for this country: templates, divisions, stockpile">🪖 Army</button>
+        </div>
+      </div>
+
+      <div id="mapInfo" style="display:none;">
+        <button id="mapInfoMin" title="Minimize this panel to see the whole map">–</button>
+        <h3 id="miTitle">—</h3>
+        <div class="row"><span>State</span><span id="miState">—</span></div>
+        <div class="row"><span>Province</span><span id="miProvince">—</span></div>
+        <div class="row" id="miRegionRow" style="display:none;">
+          <span>Strat. region <span class="mi-help" data-help="STRATEGIC REGION&#10;&#10;A big group of provinces the GAME engine uses for weather, naval & air operation zones, and AI planning. It is NOT a country or a state.&#10;&#10;This is advanced — most country mods never need to change it. Leave it alone unless you know you need to.">ⓘ</span></span>
+          <span style="display:flex; align-items:center; gap:4px;">
+            <select id="miRegionSel" style="max-width:118px; padding:2px 4px; background:#161b22; border:1px solid #30363d; border-radius:4px; color:#c9d1d9; font-size:11px;"></select>
+            <button id="miRegionRename" type="button" title="Rename the selected strategic region (writes localisation only — never the map files)" style="background:#21262d; border:1px solid #30363d; color:#c9d1d9; border-radius:4px; cursor:pointer; font-size:11px; padding:1px 6px;">✎</button>
+            <button id="miRegionNew" type="button" title="Create a new, empty strategic region (a valid weather block is copied from an existing region). Then assign provinces to it with the dropdown." style="background:#21262d; border:1px solid #30363d; color:#7ee787; border-radius:4px; cursor:pointer; font-size:11px; padding:1px 6px;">✛</button>
+          </span>
+        </div>
+        <div id="miRegionRenameRow" style="display:none; margin:0 0 4px; gap:4px; align-items:center;">
+          <input id="miRegionRenameInput" type="text" placeholder="New region name" style="flex:1; min-width:0; padding:3px 6px; background:#161b22; border:1px solid #30363d; border-radius:4px; color:#c9d1d9; font-size:11px;" />
+          <button id="miRegionRenameApply" type="button" style="background:#238636; border:1px solid #2ea043; color:#fff; border-radius:4px; cursor:pointer; font-size:11px; padding:3px 8px; white-space:nowrap;">Rename</button>
+        </div>
+        <div id="miRegionNewRow" style="display:none; margin:0 0 4px; gap:4px; align-items:center;">
+          <input id="miRegionNewInput" type="text" placeholder="Name for the new region" style="flex:1; min-width:0; padding:3px 6px; background:#161b22; border:1px solid #30363d; border-radius:4px; color:#c9d1d9; font-size:11px;" />
+          <button id="miRegionNewApply" type="button" style="background:#238636; border:1px solid #2ea043; color:#fff; border-radius:4px; cursor:pointer; font-size:11px; padding:3px 8px; white-space:nowrap;">Create</button>
+        </div>
+        <div class="row" id="miSupplyRow" style="display:none;">
+          <span>Supply area <span class="mi-help" data-help="SUPPLY AREA&#10;&#10;A group of STATES that share supply from a central hub. It sets how many troops the area can support before they start suffering attrition.&#10;&#10;Advanced and optional — only matters if you care about logistics tuning.">ⓘ</span></span>
+          <span style="display:flex; align-items:center; gap:4px;">
+            <select id="miSupplySel" style="max-width:118px; padding:2px 4px; background:#161b22; border:1px solid #30363d; border-radius:4px; color:#c9d1d9; font-size:11px;"></select>
+            <button id="miSupplyRename" type="button" title="Rename the selected supply area (writes localisation only — never the map files)" style="background:#21262d; border:1px solid #30363d; color:#c9d1d9; border-radius:4px; cursor:pointer; font-size:11px; padding:1px 6px;">✎</button>
+            <button id="miSupplyNew" type="button" title="Create a new, empty supply area. Then assign states to it with the dropdown." style="background:#21262d; border:1px solid #30363d; color:#7ee787; border-radius:4px; cursor:pointer; font-size:11px; padding:1px 6px;">✛</button>
+          </span>
+        </div>
+        <div id="miSupplyRenameRow" style="display:none; margin:0 0 4px; gap:4px; align-items:center;">
+          <input id="miSupplyRenameInput" type="text" placeholder="New supply-area name" style="flex:1; min-width:0; padding:3px 6px; background:#161b22; border:1px solid #30363d; border-radius:4px; color:#c9d1d9; font-size:11px;" />
+          <button id="miSupplyRenameApply" type="button" style="background:#238636; border:1px solid #2ea043; color:#fff; border-radius:4px; cursor:pointer; font-size:11px; padding:3px 8px; white-space:nowrap;">Rename</button>
+        </div>
+        <div id="miSupplyNewRow" style="display:none; margin:0 0 4px; gap:4px; align-items:center;">
+          <input id="miSupplyNewInput" type="text" placeholder="Name for the new supply area" style="flex:1; min-width:0; padding:3px 6px; background:#161b22; border:1px solid #30363d; border-radius:4px; color:#c9d1d9; font-size:11px;" />
+          <button id="miSupplyNewApply" type="button" style="background:#238636; border:1px solid #2ea043; color:#fff; border-radius:4px; cursor:pointer; font-size:11px; padding:3px 8px; white-space:nowrap;">Create</button>
+        </div>
+        <div class="row" id="miRailRow" style="display:none;">
+          <span>Rail / supply</span>
+          <span id="miRailInfo" title="Railways passing through this state, and supply hubs inside it. Manage them in the 🛤 Rails &amp; supply panel." style="cursor:pointer; color:#ffd24a;">—</span>
+        </div>
+        <div id="miProvFields" style="display:none; border-top:1px solid #30363d; margin-top:8px; padding-top:8px;">
+          <div style="font-size:11px; color:#8b949e; margin-bottom:4px;">Province terrain (definition.csv)</div>
+          <div class="row"><span title="Terrain category — affects combat, movement and supply">Terrain</span>
+            <select id="miTerrainSel" style="max-width:150px; padding:2px 4px; background:#161b22; border:1px solid #30363d; border-radius:4px; color:#c9d1d9; font-size:11px;"></select></div>
+          <div class="row"><span title="land, sea or lake">Type</span>
+            <select id="miTypeSel" style="max-width:150px; padding:2px 4px; background:#161b22; border:1px solid #30363d; border-radius:4px; color:#c9d1d9; font-size:11px;">
+              <option value="land">land</option><option value="sea">sea</option><option value="lake">lake</option></select></div>
+          <div class="row"><span title="Coastal provinces can host naval bases and be invaded from the sea">Coastal</span>
+            <input id="miCoastalChk" type="checkbox" style="width:auto;" /></div>
+        </div>
+        <div id="miEditFields" style="display:none; border-top:1px solid #30363d; margin-top:8px; padding-top:8px;">
+          <label style="display:block; font-size:11px; color:#8b949e; margin:6px 0 2px;">State name</label>
+          <input id="miNameInp" type="text" placeholder="Attica" style="width:100%; box-sizing:border-box; padding:4px 6px; background:#161b22; border:1px solid #30363d; border-radius:4px; color:#c9d1d9; font-size:12px;" />
+          <label style="display:block; font-size:11px; color:#8b949e; margin:6px 0 2px;">Owner</label>
+          <select id="miOwnerSel" style="width:100%; padding:4px 6px; background:#161b22; border:1px solid #30363d; border-radius:4px; color:#c9d1d9; font-size:12px;"></select>
+          <button id="miOwnerCardBtn" type="button" title="Open the owner's country card" style="margin-top:4px; width:100%; background:#21262d; border:1px solid #30363d; border-radius:4px; color:#c9d1d9; cursor:pointer; font-size:12px; padding:4px 6px;">🏳 Owner's country card</button>
+          <label style="display:block; font-size:11px; color:#8b949e; margin:6px 0 2px;">Cores (comma-separated tags)</label>
+          <input id="miCoresInp" type="text" placeholder="GRE, TUR" style="width:100%; box-sizing:border-box; padding:4px 6px; background:#161b22; border:1px solid #30363d; border-radius:4px; color:#c9d1d9; font-size:12px;" />
+          <div style="display:flex; gap:6px;">
+            <div style="flex:1;">
+              <label style="display:block; font-size:11px; color:#8b949e; margin:6px 0 2px;">Population <span class="mi-help" data-help="POPULATION&#10;&#10;The people who live in the state — its population. It's the SAME idea in vanilla HOI4 and in mods like Millennium Dawn (MD just uses real-world figures, so it runs to the hundreds of thousands / millions).&#10;&#10;Population is NOT the same as manpower: it FEEDS your recruitable manpower (the troops you can raise from it) — how much you actually get depends on conscription laws — but the population number itself isn't manpower. On disk it's stored in the state's `manpower =` field.">ⓘ</span></label>
+              <input id="miManpowerInp" type="number" min="0" style="width:100%; box-sizing:border-box; padding:4px 6px; background:#161b22; border:1px solid #30363d; border-radius:4px; color:#c9d1d9; font-size:12px;" />
+            </div>
+            <div style="flex:1;">
+              <label style="display:block; font-size:11px; color:#8b949e; margin:6px 0 2px;">Category</label>
+              <select id="miCategoryInp" title="The state's category, which gives it its building slots. The list is every state_category the game loads for this mod: the mod's own, its dependencies' and the base game's." style="width:100%; box-sizing:border-box; padding:4px 6px; background:#161b22; border:1px solid #30363d; border-radius:4px; color:#c9d1d9; font-size:12px;"></select>
+            </div>
+          </div>
+          <div style="display:flex; align-items:center; justify-content:space-between; margin:8px 0 2px;">
+            <label style="font-size:11px; color:#8b949e;">Victory points (province → value)</label>
+            <button id="miVpAddBtn" type="button" style="background:#21262d; border:1px solid #30363d; color:#58a6ff; font-size:11px; padding:1px 6px; border-radius:4px; cursor:pointer;">+ Add</button>
+          </div>
+          <div id="miVpList"></div>
+          <label style="display:block; font-size:11px; color:#8b949e; margin:8px 0 2px;">Buildings</label>
+          <div id="miBuildings" style="display:grid; grid-template-columns:1fr 1fr; gap:4px 6px;">
+            <label style="font-size:11px; color:#c9d1d9; display:flex; align-items:center; gap:4px;">Infra<input data-bld="infrastructure" type="number" min="0" style="width:38px; margin-left:auto; padding:2px 4px; background:#161b22; border:1px solid #30363d; border-radius:4px; color:#c9d1d9; font-size:11px;" /></label>
+            <label style="font-size:11px; color:#c9d1d9; display:flex; align-items:center; gap:4px;">Mil fac<input data-bld="arms_factory" type="number" min="0" style="width:38px; margin-left:auto; padding:2px 4px; background:#161b22; border:1px solid #30363d; border-radius:4px; color:#c9d1d9; font-size:11px;" /></label>
+            <label style="font-size:11px; color:#c9d1d9; display:flex; align-items:center; gap:4px;">Civ fac<input data-bld="industrial_complex" type="number" min="0" style="width:38px; margin-left:auto; padding:2px 4px; background:#161b22; border:1px solid #30363d; border-radius:4px; color:#c9d1d9; font-size:11px;" /></label>
+            <label style="font-size:11px; color:#c9d1d9; display:flex; align-items:center; gap:4px;">Dockyard<input data-bld="dockyard" type="number" min="0" style="width:38px; margin-left:auto; padding:2px 4px; background:#161b22; border:1px solid #30363d; border-radius:4px; color:#c9d1d9; font-size:11px;" /></label>
+            <label style="font-size:11px; color:#c9d1d9; display:flex; align-items:center; gap:4px;">Air base<input data-bld="air_base" type="number" min="0" style="width:38px; margin-left:auto; padding:2px 4px; background:#161b22; border:1px solid #30363d; border-radius:4px; color:#c9d1d9; font-size:11px;" /></label>
+            <label style="font-size:11px; color:#c9d1d9; display:flex; align-items:center; gap:4px;">Anti-air<input data-bld="anti_air_building" type="number" min="0" style="width:38px; margin-left:auto; padding:2px 4px; background:#161b22; border:1px solid #30363d; border-radius:4px; color:#c9d1d9; font-size:11px;" /></label>
+          </div>
+          <label style="display:block; font-size:11px; color:#8b949e; margin:8px 0 2px;">Resources</label>
+          <div id="miResources" style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:4px 6px;">
+            <label style="font-size:10px; color:#c9d1d9; display:flex; align-items:center; gap:2px;">Oil<input data-res="oil" type="number" min="0" style="width:34px; margin-left:auto; padding:2px 3px; background:#161b22; border:1px solid #30363d; border-radius:4px; color:#c9d1d9; font-size:10px;" /></label>
+            <label style="font-size:10px; color:#c9d1d9; display:flex; align-items:center; gap:2px;">Steel<input data-res="steel" type="number" min="0" style="width:34px; margin-left:auto; padding:2px 3px; background:#161b22; border:1px solid #30363d; border-radius:4px; color:#c9d1d9; font-size:10px;" /></label>
+            <label style="font-size:10px; color:#c9d1d9; display:flex; align-items:center; gap:2px;">Alu<input data-res="aluminium" type="number" min="0" style="width:34px; margin-left:auto; padding:2px 3px; background:#161b22; border:1px solid #30363d; border-radius:4px; color:#c9d1d9; font-size:10px;" /></label>
+            <label style="font-size:10px; color:#c9d1d9; display:flex; align-items:center; gap:2px;">Tung<input data-res="tungsten" type="number" min="0" style="width:34px; margin-left:auto; padding:2px 3px; background:#161b22; border:1px solid #30363d; border-radius:4px; color:#c9d1d9; font-size:10px;" /></label>
+            <label style="font-size:10px; color:#c9d1d9; display:flex; align-items:center; gap:2px;">Chr<input data-res="chromium" type="number" min="0" style="width:34px; margin-left:auto; padding:2px 3px; background:#161b22; border:1px solid #30363d; border-radius:4px; color:#c9d1d9; font-size:10px;" /></label>
+            <label style="font-size:10px; color:#c9d1d9; display:flex; align-items:center; gap:2px;">Rub<input data-res="rubber" type="number" min="0" style="width:34px; margin-left:auto; padding:2px 3px; background:#161b22; border:1px solid #30363d; border-radius:4px; color:#c9d1d9; font-size:10px;" /></label>
+          </div>
+          <label style="display:flex; align-items:center; gap:4px; font-size:11px; color:#c9d1d9; margin-top:6px;">Naval base <span style="color:#8b949e;">(province <span id="miNbProv">—</span>)</span><input id="miNavalBase" type="number" min="0" style="width:38px; margin-left:auto; padding:2px 4px; background:#161b22; border:1px solid #30363d; border-radius:4px; color:#c9d1d9; font-size:11px;" /></label>
+          <button id="miSaveBtn" style="width:100%; margin-top:10px; padding:6px; background:#238636; border:none; border-radius:4px; color:#fff; cursor:pointer; font-size:13px;">Save state</button>
+          <div style="display:flex; gap:6px; margin-top:6px;">
+            <button id="miCopyAttrsBtn" title="Copy this state's development profile — state_category, population, and the buildings and resources this panel has a field for — to reuse on another state. Owner, name, cores and victory points are NOT copied, nor a building or resource with no field here (the line names them)." style="flex:1; padding:5px; background:transparent; border:1px solid #30363d; border-radius:4px; color:#8b949e; cursor:pointer; font-size:12px;">⧉ Copy attrs</button>
+            <button id="miPasteAttrsBtn" title="Apply the copied development profile (category, population, and this panel's buildings and resources) to THIS state; a building or resource with no field here stays as this state has it. Stages an edit — click 💾 Save to write it." style="flex:1; padding:5px; background:transparent; border:1px solid #30363d; border-radius:4px; color:#8b949e; cursor:pointer; font-size:12px;">📋 Paste attrs</button>
+          </div>
+          <button id="miDeleteBtn" style="width:100%; margin-top:6px; padding:5px; background:transparent; border:1px solid #6e2730; border-radius:4px; color:#f85149; cursor:pointer; font-size:12px;">Delete state (mod states only)</button>
+          <button id="miMergeBtn" style="width:100%; margin-top:6px; padding:5px; background:transparent; border:1px solid #9e6a00; border-radius:4px; color:#d29922; cursor:pointer; font-size:12px;" title="Move ALL of this state's provinces into another state, then remove this one — the safe way to combine two states (no emptied state left to crash the game).">🔗 Merge into another state…</button>
+        </div>
+        <button id="miAssignBtn" style="display:none; width:100%; margin-top:8px; padding:6px; background:#1f6feb; border:none; border-radius:4px; color:#fff; cursor:pointer; font-size:13px;">Assign to —</button>
+      </div>
+    </div>
+  </main>
+
+  <!-- 🌍 Generate a world's progress panel. FIXED over the whole page, above the nav and toolbar rows (z-index 1000000 !important in
+       styles.css), so nothing else can be clicked while the world is written — and below Nova's own dialogs (ai-field-assist.js,
+       2147483000 and up). It has no Stop: stopping part-way leaves a half-built map. Close appears once the run has ended. -->
+  <div id="mapWorldProgress" style="display:none; position:fixed; inset:0; z-index:2147482000; background:rgba(1,4,9,0.82); align-items:center; justify-content:center;">
+    <div style="width:min(640px,92%); max-height:92vh; overflow-y:auto; box-sizing:border-box; background:#161b22; border:1px solid #3fb950; border-radius:10px; padding:18px 20px; color:#e6edf3; box-shadow:0 8px 32px rgba(0,0,0,0.6);">
+      <div id="mapWorldTitle" style="font-size:16px; font-weight:700; color:#7ee2a8;">🌍 Generating a world</div>
+      <div id="mapWorldElapsed" style="margin-top:4px; font-size:12px; color:#8b949e;"></div>
+      <div id="mapWorldSteps" style="margin-top:12px; font-size:13px; line-height:1.5;"></div>
+      <div id="mapWorldFoot" style="margin-top:12px; font-size:12.5px; line-height:1.5; color:#c9d1d9; white-space:pre-wrap;"></div>
+      <details id="mapWorldDetails" style="display:none; margin-top:12px; font-size:12.5px; color:#c9d1d9;"><summary>What each step did</summary></details>
+      <div style="display:flex; justify-content:flex-end; margin-top:14px;">
+        <button id="mapWorldClose" style="display:none; padding:7px 14px; background:#21262d; border:1px solid #30363d; border-radius:6px; color:#c9d1d9; cursor:pointer; font-size:13px;">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="./nova-i18n.js?v=1"></script>
+  <script src="./nova-bug-report.js?v=2"></script>
+  <script src="./ai-field-assist.js"></script>
+  <script src="./map-rule-labels.js?v=20"></script>
+  <script src="./country-card.js?v=2"></script>
+  <script src="./map.js?v=141"></script>
+  <script src="./map-dev-warning.js"></script>
+</body>
+</html>

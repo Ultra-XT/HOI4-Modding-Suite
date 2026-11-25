@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Nova Modding Suite - Military</title>
+  <script src="./nova-i18n.js?v=1"></script>
+  <script src="./nova-bug-report.js?v=2"></script>
+  <script src="./loading-overlay.js?v=oobnote6"></script>
+  <script src="./nova-combo.js?v=5"></script>
+  <link rel="stylesheet" href="./styles.css?v=suite103b" />
+  <style>
+    html, body { overflow-y: auto !important; height: auto !important; min-height: 100vh; background: #0d1117; color: #c9d1d9; }
+    /* Companies tab: the embedded editor is its own fixed-viewport two-pane app (folders sidebar + editor,
+       each scrolling in its own panel) exactly like the standalone National Spirits page. The iframe gets a
+       viewport height below and scrolls internally, so this tab needs no page-level bottom padding — trim it
+       so the frame sits flush and the tab doesn't grow a dead strip under it. #companies-embed */
+    body.companies-fit .army-container { padding-bottom: 0; }
+    /* #companies-embed-sidebar-cut-off — the embedded editor is a fixed-viewport two-pane app sized to the
+       space under the header, so the page has nothing left to scroll. Saying so stops a second scrollbar
+       appearing beside the editor's own. */
+    body.companies-fit { overflow: hidden; }
+    #companiesFrame { display: block; }
+    .army-container { max-width: 1550px; margin: 0 auto; padding: 24px 24px 80px; font-family: 'Inter', sans-serif; }
+    .army-head { display: flex; align-items: baseline; gap: 14px; margin: 8px 0 18px; }
+    .army-head h1 { font-size: 26px; font-weight: 800; color: #fff; margin: 0; }
+    .army-head .army-sub { color: #8b949e; font-size: 13px; }
+
+    /* Active-mod / country context row */
+    .army-context { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; background: rgba(22,27,34,0.7); border: 1px solid rgba(148,163,184,0.15); border-radius: 12px; padding: 12px 16px; margin-bottom: 16px; }
+    .army-context .ctx-label { color: #8b949e; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .army-context b { color: #58a6ff; }
+
+    /* Inner sub-tabs (segmented) */
+    .army-subtabs { display: inline-flex; gap: 4px; background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 4px; margin-bottom: 18px; }
+    .army-subtab { background: transparent; border: none; color: #8b949e; font-size: 14px; font-weight: 600; padding: 9px 18px; border-radius: 7px; cursor: pointer; transition: background .15s, color .15s, box-shadow .15s, transform .06s; display: inline-flex; align-items: center; gap: 7px; }
+    .army-subtab:hover { color: #c9d1d9; }
+    .army-subtab.active { background: rgba(31,111,235,0.22); color: #fff; box-shadow: inset 0 0 0 1px rgba(31,111,235,0.5); }
+
+    .army-panel { display: none; }
+    .army-panel.active { display: block; }
+
+    .army-card { background: rgba(22,27,34,0.6); border: 1px solid rgba(148,163,184,0.12); border-radius: 12px; padding: 18px 20px; margin-bottom: 16px; }
+    .army-card h3 { margin: 0 0 4px; font-size: 15px; color: #f0f6fc; }
+    .army-card .card-sub { color: #8b949e; font-size: 12.5px; margin: 0 0 14px; line-height: 1.5; }
+
+    .army-placeholder { border: 1px dashed #30363d; border-radius: 10px; padding: 28px; text-align: center; color: #6e7681; font-size: 13px; line-height: 1.6; }
+    .army-loading { color: #8b949e; font-size: 13px; padding: 8px 2px; line-height: 1.5; }
+    .army-empty { color: #8b949e; font-size: 12.5px; padding: 6px 2px; line-height: 1.5; }
+    /* When an empty/loading note is the ONLY thing in its panel it is a full-panel state, not an inline note —
+       give it room + centre it, and pulse the loading dot so it reads as considered, not bare. */
+    .army-empty:only-child, .army-loading:only-child { padding: 16px 14px; text-align: center; }
+    .army-loading:only-child::before { content: ''; display: inline-block; width: 7px; height: 7px; margin-right: 7px; border-radius: 50%; background: #58a6ff; vertical-align: middle; animation: nova-pulse 1s ease-in-out infinite; }
+    @keyframes nova-pulse { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
+    /* An empty editor panel was a one-line strip beside a tall list — centre it so the panel balances (both tabs). */
+    #armyDesigner:has(> .army-empty:only-child), #eqEditor:has(> .army-empty:only-child) { min-height: 340px; display: flex; align-items: center; justify-content: center; text-align: center; }
+
+    /* Designer controls */
+    .army-input { background: #0d1117; border: 1px solid #30363d; color: #c9d1d9; border-radius: 7px; padding: 8px 10px; font-size: 13px; outline: none; transition: border-color .12s ease, box-shadow .12s ease; }
+    .army-input:focus { border-color: #1f6feb; box-shadow: 0 0 0 3px rgba(31,111,235,0.22); }
+    /* Read-only stat/module fields render as disabled inputs — give them a subtle cue without dimming the value. */
+    .army-input:disabled { opacity: 0.75; cursor: default; }
+    .army-btn { background: #238636; border: 1px solid #2ea043; color: #fff; font-weight: 700; border-radius: 7px; padding: 8px 14px; font-size: 13px; cursor: pointer; transition: background .15s, transform .06s, filter .12s, box-shadow .15s; }
+    /* Unsaved-changes cue on 💾 Save army: amber glow + a dot, so "there's something to save" is visible. */
+    .army-btn.unsaved { box-shadow: 0 0 0 2px rgba(210,153,34,0.55); }
+    .army-btn.unsaved::after { content: " •"; color: #ffd166; }
+    .army-btn:hover { background: #2ea043; }
+    .army-btn:disabled { opacity: 0.55; cursor: default; }
+    .army-btn:disabled:hover { background: #238636; }
+    .army-btn-sm { background: #21262d; border: 1px solid #30363d; color: #c9d1d9; border-radius: 6px; padding: 5px 11px; font-size: 12px; font-weight: 600; cursor: pointer; transition: background .15s, transform .06s, filter .12s; }
+    .army-btn-sm:hover { background: #30363d; }
+    .army-btn-sm:disabled, .army-btn-sm[disabled] { opacity: 0.55; cursor: default; }
+    .army-btn-sm:disabled:hover { background: #21262d; }
+    /* Navy/Air domain toggle (selected pill) */
+    .na-dom.na-dom-sel { background: #1f6feb; border-color: #1f6feb; color: #fff; }
+    .na-dom.na-dom-sel:hover { background: #388bfd; }
+    .army-btn-danger { background: transparent; border: 1px solid #6e2a2a; color: #f0857a; border-radius: 6px; padding: 5px 11px; font-size: 12px; cursor: pointer; transition: background .15s, transform .06s, filter .12s; }
+    .army-btn-danger:hover { background: rgba(248,81,73,0.12); }
+    .army-btn-danger:disabled, .army-btn-danger[disabled] { opacity: 0.55; cursor: default; }
+    .army-btn-danger:disabled:hover { background: transparent; }
+    /* A subtle press on all three button tiers (never on a disabled one). */
+    .army-subtab:not(.active):active, .army-btn:not(:disabled):active, .army-btn-sm:not(:disabled):active, .army-btn-danger:not(:disabled):active { transform: translateY(1px); filter: brightness(.93); }
+    /* Keyboard focus ring on the app accent; mouse clicks stay clean. */
+    .army-subtab:focus-visible, .army-btn:focus-visible, .army-btn-sm:focus-visible, .army-btn-danger:focus-visible { outline: 2px solid #58a6ff; outline-offset: 2px; }
+    .army-subtab:focus:not(:focus-visible), .army-btn:focus:not(:focus-visible), .army-btn-sm:focus:not(:focus-visible), .army-btn-danger:focus:not(:focus-visible) { outline: none; }
+
+    .divisions-layout { display: grid; grid-template-columns: 360px 1fr; gap: 16px; align-items: start; }
+    @media (max-width: 1000px) { .divisions-layout { grid-template-columns: 1fr; } }
+
+
+    .tpl-row { display: flex; align-items: center; gap: 8px; background: #161b22; border: 1px solid #30363d; border-radius: 7px; padding: 8px 10px; cursor: pointer; margin-bottom: 5px; transition: border-color .12s ease, background-color .12s ease; }
+    .tpl-row:hover { border-color: #4b5563; background: #1c2230; }
+    .tpl-row.active { border-color: #58a6ff; background: rgba(31,111,235,0.14); }
+    .tpl-row .tpl-name { font-weight: 600; color: #e6edf3; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .tpl-row .tpl-meta { color: #8b949e; font-size: 11px; white-space: nowrap; }
+    /* #military-cannot-duplicate — the copy button. Quiet until the row is hovered so the list still reads
+       as a list of templates rather than a list of buttons. */
+    .tpl-row .tpl-dup { background: transparent; border: 1px solid transparent; color: #6e7681; border-radius: 5px;
+      padding: 2px 7px; font-size: 13px; cursor: pointer; line-height: 1.2; opacity: 0; transition: opacity .12s, color .12s, border-color .12s; }
+    .tpl-row:hover .tpl-dup, .tpl-row.active .tpl-dup { opacity: 1; }
+    .tpl-row .tpl-dup:hover { color: #58a6ff; border-color: #30363d; background: #0d1117; }
+    .tpl-row .tpl-dup:focus-visible { opacity: 1; outline: 2px solid #58a6ff; outline-offset: 1px; }
+    /* Unsaved marker rides the meta (right side, never clipped) instead of the ellipsized name. */
+    .tpl-row.dirty .tpl-meta::before { content: "• "; color: #d29922; font-weight: 700; }
+
+    /* The composition grid */
+    /* .comp-label is still used (the "Designed variants on TAG" heading in the modular designer). */
+    .comp-label { font-size: 11px; color: #8b949e; text-transform: uppercase; letter-spacing: .5px; margin: 12px 0 6px; font-weight: 700; }
+    .designer-fields { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; align-items: flex-end; }
+    .designer-fields label { display: flex; flex-direction: column; gap: 3px; font-size: 11px; color: #8b949e; }
+    .deploy-lbl { display: flex; flex-direction: column; gap: 3px; font-size: 11px; color: #8b949e; }
+    .deploy-row { display: flex; align-items: center; gap: 8px; background: #161b22; border: 1px solid #30363d; border-radius: 7px; padding: 7px 10px; font-size: 12.5px; margin-bottom: 5px; }
+    .deploy-row .dr-tpl { font-weight: 600; color: #e6edf3; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .deploy-row .dr-meta { color: #8b949e; font-size: 11px; white-space: nowrap; flex-shrink: 0; }
+    .deploy-row .dr-del { margin-left: auto; color: #8b949e; cursor: pointer; font-weight: 700; transition: color .15s ease; }
+    .deploy-row .dr-del:hover { color: #f85149; }
+    /* ✎ sits before the ×, and takes the margin-left:auto so the pair stays right-aligned together.
+       #edit-variant-prefill */
+    .deploy-row .dr-edit { margin-left: auto; color: #8b949e; cursor: pointer; font-weight: 700; transition: color .15s ease; }
+    .deploy-row .dr-edit:hover { color: #58a6ff; }
+    .deploy-row .dr-edit + .dr-del { margin-left: 10px; }
+
+    /* Placed-division COUNTER tiles (game-like) */
+    .dep-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(268px, 1fr)); gap: 10px; }
+    .dep-tile { position: relative; display: flex; align-items: center; gap: 13px; background: #161b22; border: 1px solid #30363d; border-radius: 9px; padding: 10px 12px; transition: border-color .15s ease, box-shadow .15s ease; }
+    .dep-tile:hover { border-color: #4b5563; box-shadow: 0 2px 10px rgba(0,0,0,0.3); }
+    .dep-counter { position: relative; flex: 0 0 auto; width: 76px; height: 47px; border: 2px solid var(--uc); border-radius: 4px; background: linear-gradient(180deg, rgba(255,255,255,0.07), rgba(0,0,0,0.22)); box-shadow: inset 0 0 0 1px rgba(0,0,0,0.35); display: flex; align-items: center; justify-content: center; color: var(--uc); }
+    .dep-counter .unit-sym { width: 58px; height: 36px; }
+    .dep-echelon { position: absolute; top: -8px; left: 50%; transform: translateX(-50%); font-size: 9px; font-weight: 800; letter-spacing: 1.5px; color: #c9d1d9; background: #161b22; padding: 0 4px; line-height: 1; }
+    .dep-count { position: absolute; top: -9px; right: -9px; background: var(--uc); color: #0d1117; font-weight: 800; font-size: 11px; border-radius: 10px; padding: 1px 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.45); }
+    .dep-body { flex: 1; min-width: 0; }
+    .dep-name { font-weight: 700; color: #f0f6fc; font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .dep-loc { color: #8b949e; font-size: 11.5px; margin-top: 1px; }
+    .dep-chips { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+    .dep-chip { font-size: 10.5px; background: #0d1117; border: 1px solid #30363d; border-radius: 5px; padding: 2px 7px; color: #adbac7; }
+    /* The delete × only appears on hover — keeps resting tiles clean, reveals the affordance when reached. */
+    .dep-del { position: absolute; top: 6px; right: 9px; color: #8b949e; cursor: pointer; font-weight: 700; font-size: 15px; line-height: 1; opacity: 0; transition: opacity .12s ease, color .15s ease; }
+    .dep-tile:hover .dep-del { opacity: 1; }
+    .dep-del:hover { color: #f85149; }
+    /* Sits beside the ×, same reveal-on-hover, so a tile carries its two per-division actions and nothing
+       more. #x2-brigade-cards */
+    .dep-dup { position: absolute; top: 6px; right: 28px; color: #8b949e; cursor: pointer; font-weight: 700; font-size: 14px; line-height: 1; opacity: 0; transition: opacity .12s ease, color .15s ease; }
+    .dep-tile:hover .dep-dup { opacity: 1; }
+    .dep-dup:hover { color: #3fb950; }
+
+    /* Equipment list + editor */
+    /* Flow as one wrapping caption — as a flex row each of the three segments shrank + wrapped its OWN text
+       into a ragged 3-column block. Block flow lets it read as a single heading. */
+    .eq-fam-head { font-size: 11px; color: #8b949e; text-transform: uppercase; letter-spacing: .5px; margin: 10px 0 4px; display: block; line-height: 1.45; font-weight: 700; }
+    .eq-fam-head span { font-weight: 400; } /* keep the "— name" / "· N variants" qualifiers secondary */
+    .eq-list-scroll { max-height: 560px; overflow: auto; }
+    /* Thin custom scrollbar to match the rest of the app (was the chunky default OS bar). */
+    .eq-list-scroll, .mp-list, .ip-grid, .mp-scroll { scrollbar-width: thin; scrollbar-color: rgba(110,118,129,0.55) transparent; }
+    .eq-list-scroll::-webkit-scrollbar, .mp-list::-webkit-scrollbar, .ip-grid::-webkit-scrollbar, .mp-scroll::-webkit-scrollbar { width: 9px; height: 9px; }
+    .eq-list-scroll::-webkit-scrollbar-track, .mp-list::-webkit-scrollbar-track, .ip-grid::-webkit-scrollbar-track, .mp-scroll::-webkit-scrollbar-track { background: transparent; }
+    .eq-list-scroll::-webkit-scrollbar-thumb, .mp-list::-webkit-scrollbar-thumb, .ip-grid::-webkit-scrollbar-thumb, .mp-scroll::-webkit-scrollbar-thumb { background: rgba(110,118,129,0.5); border-radius: 6px; border: 2px solid transparent; background-clip: padding-box; }
+    .eq-list-scroll::-webkit-scrollbar-thumb:hover, .mp-list::-webkit-scrollbar-thumb:hover, .ip-grid::-webkit-scrollbar-thumb:hover, .mp-scroll::-webkit-scrollbar-thumb:hover { background: rgba(139,148,158,0.8); background-clip: padding-box; }
+    .eq-row { display: flex; align-items: center; gap: 8px; background: #161b22; border: 1px solid #30363d; border-radius: 7px; padding: 7px 10px; cursor: pointer; margin-bottom: 5px; transition: border-color .12s ease, background-color .12s ease; }
+    .eq-row:hover { border-color: #4b5563; background: #1c2230; }
+    .eq-row.active { border-color: #58a6ff; background: rgba(31,111,235,0.14); }
+    .eq-row.tier { margin-left: 16px; }
+    .eq-row .eq-id { font-weight: 600; color: #e6edf3; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: monospace; font-size: 12px; }
+    .eq-row .eq-yr { color: #8b949e; font-size: 11px; }
+    /* Country-variant rows (the arsenal): real weapon names, owner tag, base type */
+    .eqv-row { display: flex; align-items: center; gap: 8px; background: #161b22; border: 1px solid #30363d; border-radius: 7px; padding: 7px 10px; cursor: pointer; margin-bottom: 5px; transition: border-color .12s ease, background-color .12s ease; }
+    .eqv-row:hover { border-color: #4b5563; background: #1c2230; }
+    .eqv-row.active { border-color: #58a6ff; background: rgba(31,111,235,0.14); }
+    .eqv-row.obs { opacity: 0.55; }
+    .eqv-row.tier { margin-left: 16px; } /* variants nest under their family, like the equipment tiers */
+    .eqv-row .eqv-name { font-weight: 600; color: #e6edf3; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; }
+    .eq-tag-chip { font-size: 9.5px; font-weight: 800; letter-spacing: .5px; padding: 1px 5px; border-radius: 4px; background: rgba(88,166,255,0.14); color: #58a6ff; white-space: nowrap; }
+    .eq-cchip { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; background: rgba(31,111,235,0.18); color: #9ecbff; border: 1px solid rgba(31,111,235,0.5); border-radius: 12px; padding: 2px 8px; }
+    .eq-cchip .cchip-x { cursor: pointer; color: #8b949e; font-weight: 800; transition: color .15s ease; }
+    .eq-cchip .cchip-x:hover { color: #f85149; }
+    .eq-badge { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; padding: 1px 5px; border-radius: 4px; white-space: nowrap; }
+    .eq-badge.mod { background: rgba(63,185,80,0.15); color: #3fb950; }
+    .eq-badge.base { background: rgba(139,148,158,0.14); color: #8b949e; }
+    .eq-badge.arch { background: rgba(88,166,255,0.14); color: #58a6ff; }
+    .eq-badge.dlc { background: rgba(210,153,34,0.16); color: #e0b44a; text-transform: none; }
+    .eq-ico { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 27px; height: 20px; border: 1px solid; border-radius: 4px; flex-shrink: 0; background: rgba(0,0,0,0.22); overflow: hidden; }
+    .eq-ico .unit-sym { width: 21px; height: 15px; }
+    .eq-ico-lg { width: 42px; height: 30px; }
+    .eq-ico-lg .unit-sym { width: 34px; height: 22px; }
+    .eq-ico .eq-glyph { display: inline-flex; align-items: center; justify-content: center; }
+    /* the real in-game picture (CONTAINED, not strip-cropped so it never bleeds); mountEqIcons shows it on a
+       real hit (and hides the glyph), leaves it hidden on the "?" placeholder so the category glyph shows. */
+    .eq-ico .eq-pic { display: none; position: absolute; inset: 1px; background-size: contain; background-position: center; background-repeat: no-repeat; }
+    /* ── Big vehicle picture in the variant editor (beside the modules, in-game feel) #variant-photo ── */
+    /* flex-START, not stretch: the right column (picture + "Designed by") is now taller than the module grid,
+       and stretching the grid to match spread its two rows apart into a giant gap. Top-aligned, the modules
+       pack naturally and the picture/company panel simply extend below. #vv-no-gap */
+    .vv-modules-wrap { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; margin: 14px 0; }
+    .vv-modules-wrap .vv-modules-grid { flex: 1 1 340px; min-width: 0; margin: 0; }
+    .vv-photo-solo { display: flex; justify-content: center; margin: 14px 0; }
+    /* Width comes from .vv-right-col; height HUGS the picture's aspect (set by mountEqIcons) so a wide
+       ~2:1 plane/tank/ship picture doesn't float in a tall box of empty space. 150px is the pre-load
+       default (≈ what a 2:1 picture in a 280-wide box settles to) + the glyph-only height. #vv-photo-hug */
+    .vv-photo { position: relative; width: 100%; height: 150px; min-height: 120px; border: 1px solid; border-radius: 10px; overflow: hidden; display: flex; align-items: center; justify-content: center; background: radial-gradient(ellipse at 50% 45%, rgba(88,166,255,0.08), rgba(0,0,0,0.30)); box-shadow: inset 0 0 0 1px rgba(0,0,0,0.35); }
+    .vv-photo .eq-glyph { display: flex; align-items: center; justify-content: center; width: 88px; height: 62px; opacity: 0.32; }
+    .vv-photo .eq-glyph .unit-sym { width: 88px; height: 62px; }
+    .vv-photo .eq-pic { display: none; position: absolute; inset: 12px; background-size: contain; background-position: center; background-repeat: no-repeat; image-rendering: auto; }
+    .eq-editor-fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin: 14px 0; }
+    /* justify-content:flex-end bottom-aligns every input in a row even when one label wraps to two
+       lines ("Naval strike targeting") — boxes sit on the same line, professional. #stat-alignment */
+    .eq-editor-fields label { display: flex; flex-direction: column; gap: 3px; font-size: 11px; color: #8b949e; justify-content: flex-end; }
+    /* Clickable purple "?" help chips (same look as the Research sidebar) + their tiny modal. */
+    .sb-help { display: inline-flex; align-items: center; justify-content: center; width: 15px; height: 15px; border-radius: 50%; background: #482f6e; color: #d1b4ff; font-size: 10px; font-weight: bold; cursor: pointer; margin-left: 5px; vertical-align: middle; user-select: none; flex: 0 0 auto; transition: background .15s, color .15s; }
+    .sb-help:hover { background: #5d3b8e; color: #fff; }
+    #armyHelpModal { position: fixed; inset: 0; background: rgba(1,4,9,0.55); display: none; align-items: center; justify-content: center; z-index: 300; }
+    #armyHelpModal .ahm-box { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 18px 20px; max-width: 460px; width: calc(100vw - 60px); box-shadow: 0 18px 50px rgba(0,0,0,0.55); }
+    #armyHelpModal .ahm-title { font-weight: 800; color: #f0f6fc; font-size: 15px; margin: 0 0 8px; display: flex; align-items: center; }
+    #armyHelpModal .ahm-body { color: #adbac7; font-size: 13px; line-height: 1.55; }
+    #armyHelpModal .ahm-close { margin-left: auto; background: none; border: none; color: #8b949e; font-size: 20px; line-height: 1; cursor: pointer; transition: color .15s ease; }
+    #armyHelpModal .ahm-close:hover { color: #f85149; }
+    .eq-editor-fields label .stat-ico { vertical-align: -2px; margin-right: 3px; }
+    .eq-editor-fields .army-input { width: 100%; box-sizing: border-box; }
+    .eq-enabled { margin: 8px 0; font-size: 12px; color: #8b949e; }
+    /* Editable plane-role editor (allow_mission_type) — a tidy checkbox grid + inline Save. */
+    .role-editor { margin: 8px 0 2px; }
+    .role-note { color: #6e7681; font-size: 11px; margin: 0 0 6px; }
+    .role-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 4px 12px; }
+    .role-opt { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #c9d1d9; cursor: pointer; }
+    .role-actions { margin-top: 9px; display: flex; align-items: center; gap: 8px; }
+    .role-status { font-size: 11px; color: #8b949e; }
+    .bp-roles { margin-top: 12px; padding-top: 10px; border-top: 1px solid #21262d; }
+    .eq-chip { display: inline-block; background: #1f6feb22; border: 1px solid #1f6feb55; border-radius: 5px; padding: 2px 7px; font-size: 11px; color: #cbd5e1; margin: 0 4px 4px 0; }
+    .eq-chip.tech-chip { display: inline-flex; align-items: center; gap: 5px; font-family: monospace; }
+    /* A tech chip is a link to that tech in the Research Tree — keep the chip look, add a hover cue. */
+    a.eq-chip.tech-chip { text-decoration: none; cursor: pointer; transition: border-color .12s ease, background-color .12s ease; }
+    a.eq-chip.tech-chip:hover { border-color: #58a6ff; background: #1f6feb33; }
+    .tech-ico { display: inline-block; width: 20px; height: 18px; background-repeat: no-repeat; background-position: left center; background-size: contain; flex-shrink: 0; }
+    .eq-readonly-note { background: rgba(139,148,158,0.1); border: 1px solid rgba(139,148,158,0.25); border-radius: 8px; padding: 10px 12px; color: #8b949e; font-size: 12.5px; line-height: 1.5; }
+
+    /* ── Game-style Division Designer ── */
+    .unit-sym { width: 100%; height: 22px; display: block; }
+    .pal-group-h { font-size: 10px; text-transform: uppercase; letter-spacing: .6px; font-weight: 700; margin-bottom: 5px; opacity: .9; }
+    .pal-tiles { display: flex; flex-wrap: wrap; gap: 6px; }
+    .unit-pick, .unit-tile { width: 62px; border: 1.5px solid var(--uc); border-radius: 5px; background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(0,0,0,0.15)); box-shadow: inset 0 0 0 1px rgba(0,0,0,0.35); display: flex; flex-direction: column; align-items: center; padding: 4px 2px 3px; cursor: pointer; position: relative; }
+    .unit-pick { color: #c9d1d9; transition: filter .12s ease, transform .06s ease; }
+    .unit-pick:hover { filter: brightness(1.25); }
+    .unit-ico { width: 100%; height: 22px; display: flex; align-items: center; justify-content: center; position: relative; }
+    .unit-ico .unit-glyph { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; }
+    /* the REAL in-game battalion picture (helmet / tank / IFV). The counter sprite is a 2-frame strip
+       (normal|selected), so we show frame 0 only: background-size 200% width crops to the left half.
+       mountUnitIcons reveals it on a real hit (and hides .unit-glyph); the "?" placeholder leaves the
+       NATO glyph showing. #unit-icons */
+    .unit-ico .unit-pic { display: none; position: absolute; top: 0; left: 50%; transform: translateX(-50%); height: 100%; width: 40px; background-size: 200% 100%; background-position: left center; background-repeat: no-repeat; }
+    .dep-counter .unit-glyph { display: flex; align-items: center; justify-content: center; }
+    .dep-counter .unit-pic { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); height: 34px; width: 60px; background-size: 200% 100%; background-position: left center; background-repeat: no-repeat; }
+    .unit-lbl { font-size: 8.5px; font-weight: 700; color: #e6edf3; margin-top: 2px; text-transform: uppercase; letter-spacing: .3px; max-width: 100%; padding: 0 4px; box-sizing: border-box; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    /* Real in-game pictures resolve async; fade them in so they settle instead of popping hard. */
+    @keyframes armyPicFade { from { opacity: 0; } to { opacity: 1; } }
+    .unit-pic, .eq-pic, .bp-photo-img { animation: armyPicFade .18s ease both; }
+    .dz-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+    .dz-name { flex: 1; background: #0d1117; border: 1px solid #30363d; color: #f0f6fc; border-radius: 7px; padding: 9px 12px; font-size: 16px; font-weight: 700; outline: none; transition: border-color .12s ease, box-shadow .12s ease; }
+    .dz-name:focus { border-color: #1f6feb; box-shadow: 0 0 0 3px rgba(31,111,235,0.22); }
+    .dz-prio { display: flex; flex-direction: column; gap: 2px; font-size: 10px; color: #8b949e; }
+    .dz-body { display: grid; grid-template-columns: 1fr 210px; gap: 16px; align-items: start; }
+    @media (max-width: 1180px) { .dz-body { grid-template-columns: 1fr; } }
+    .dz-canvas { background: rgba(13,17,23,0.5); border: 1px solid #21262d; border-radius: 10px; padding: 12px 14px; }
+    .dz-section-h { font-size: 10.5px; text-transform: uppercase; letter-spacing: .7px; color: #8b949e; font-weight: 700; margin: 4px 0 8px; }
+    .reg-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+    @media (max-width: 640px) { .reg-grid { grid-template-columns: repeat(3, 1fr); } }
+    .reg-col { display: flex; flex-direction: column; gap: 6px; background: rgba(0,0,0,0.18); border: 1px solid #21262d; border-radius: 7px; padding: 6px; min-height: 74px; }
+    .unit-tile { width: 100%; cursor: default; }
+    .unit-tile .ut-del { position: absolute; top: -6px; right: -6px; width: 15px; height: 15px; border-radius: 50%; background: #21262d; border: 1px solid #444c56; color: #f0857a; font-size: 11px; line-height: 13px; text-align: center; cursor: pointer; opacity: 0; transition: opacity .1s; }
+    /* ✎ hover-reveal on a palette tile → open the battalion stat editor (doesn't trigger the add-click). */
+    .unit-pick .su-edit { position: absolute; top: -6px; left: -6px; width: 15px; height: 15px; border-radius: 50%; background: #21262d; border: 1px solid #444c56; color: #8b949e; font-size: 9px; line-height: 13px; text-align: center; cursor: pointer; opacity: 0; transition: opacity .1s, color .12s, border-color .12s; z-index: 2; }
+    .unit-pick:hover .su-edit { opacity: 1; }
+    .unit-pick .su-edit:hover { color: #58a6ff; border-color: #58a6ff; }
+    .unit-tile:hover .ut-del { opacity: 1; }
+    .slot-add { background: rgba(255,255,255,0.02); border: 1.5px dashed #3d444d; border-radius: 5px; color: #8b949e; font-size: 20px; font-weight: 700; line-height: 1; padding: 10px 0; cursor: pointer; width: 100%;  transition: border-color .12s ease, background-color .12s ease, color .12s ease, transform .06s ease;}
+    .slot-add:hover { border-color: #58a6ff; color: #58a6ff; background: rgba(31,111,235,0.08); }
+    /* faint placeholder cells that keep the full 5-slot column shape visible, like the game's locked slots */
+    .slot-ghost { border: 1px dashed rgba(48,54,61,0.55); border-radius: 5px; min-height: 38px; background: rgba(0,0,0,0.12); }
+    /* Support | Combat sections side by side — the in-game division designer layout */
+    .dz-grid-wrap { display: flex; gap: 14px; align-items: stretch; }
+    .dz-grid-support { flex: 0 0 88px; }
+    .dz-grid-support .reg-col, .dz-grid-support > .reg-col { min-width: 74px; }
+    .dz-grid-divider { width: 1px; background: linear-gradient(180deg, transparent, #30363d 12%, #30363d 88%, transparent); }
+    .dz-grid-combat { flex: 1; min-width: 0; }
+    .dz-hint { margin: 10px 0 0; font-size: 11.5px; color: #6e7681; font-style: italic; }
+    .dz-needs { margin-top: 12px; font-size: 11px; color: #8b949e; word-break: break-word; }
+    /* Template metadata row (names group / counter icon / override model / locked) */
+    .dz-meta { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: flex-end; margin-top: 12px; padding-top: 10px; border-top: 1px solid #21262d; }
+    .dz-meta label { display: flex; flex-direction: column; gap: 3px; font-size: 11px; color: #8b949e; }
+    /* Keep each field's "?" on the SAME line as its label text. Without this the label's column flex let the
+       help bubble wrap onto its own line, so it read as an orphan "?" floating under the words. #per-field-help */
+    .dz-meta .dz-lbl { display: inline-flex; align-items: center; white-space: nowrap; }
+
+    /* "What are you making?" — the single entrance to every kind of new equipment. #one-door */
+    .nf-kind { margin: 8px 0 14px; max-width: 560px; }
+
+    /* The weapon creator renders INSIDE the designer box, not in an overlay — a modal is what made it feel
+       like a separate third designer. #new-weapon */
+    .nw-wrap { border: 1px solid #30363d; border-radius: 10px; background: #0d1117; padding: 14px 16px; }
+    .nw-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
+    .nw-head b { color: #e6edf3; font-size: 14px; }
+    .nw-lead { color: #8b949e; font-size: 12px; line-height: 1.5; margin: 6px 0 12px; }
+    /* The .nova-combo dropdown's styles moved to styles.css alongside nova-combo.js. #combo */
+
+    /* A column IS a regiment, and a regiment holds one group. Name it, and flag it when it doesn't. #column-group */
+    .reg-col-h { font-size: 9.5px; text-transform: uppercase; letter-spacing: .4px; color: #6e7681; text-align: center;
+      padding: 2px 0 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .reg-col-h.bad { color: #d29922; font-weight: 700; }
+    .reg-col-bad { outline: 1px solid rgba(210,153,34,0.5); outline-offset: 2px; border-radius: 8px; }
+
+    /* Live preview of the picked map symbol — the number IS the picture, so show it. #tpl-counter-list */
+    .me-gfx-prev { width: 30px; height: 30px; object-fit: contain; display: none; flex: none;
+      background: #0d1117; border: 1px solid #30363d; border-radius: 5px; padding: 1px; }
+
+    /* Collapsible cards (Stockpile, Navy & Air) — click the title to fold them away. #army-collapsible */
+    .army-collapsible > h3 { cursor: pointer; user-select: none; display: flex; align-items: center; gap: 8px; }
+    .army-collapsible > h3 .col-chev { margin-left: auto; color: #8b949e; font-size: 12px; transition: transform .15s; }
+    .army-collapsible.collapsed > h3 .col-chev { transform: rotate(-90deg); }
+    .army-collapsible.collapsed > *:not(h3) { display: none !important; }
+    .army-collapsible.collapsed { padding-bottom: 14px; }
+
+    /* The company that DESIGNS a variant — shown below its picture, like the in-game designer. #mio-design */
+    .vv-right-col { flex: 0 0 280px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+    .vv-companies { display: flex; flex-direction: column; gap: 6px; }
+    .vv-co-label { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: #8b949e; display: flex; align-items: center; gap: 6px; }
+    .vv-co { position: relative; display: flex; align-items: center; gap: 9px; padding: 7px 9px; background: #161b22; border: 1px solid #30363d; border-radius: 8px; cursor: default; }
+    .vv-co-ico { width: 34px; height: 34px; flex: none; border-radius: 5px; background: #0d1117 center/contain no-repeat; border: 1px solid #30363d; }
+    .vv-co-body { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+    .vv-co-name { color: #e6edf3; font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .vv-co-tag { color: #58a6ff; font-size: 10px; font-weight: 700; }
+    .vv-co-buffs { color: #7ab87a; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .vv-co-more, .vv-co-none { color: #6e7681; font-size: 11px; padding: 2px 2px; }
+    /* hover popup: the full trait/bonus list */
+    .vv-co-pop { position: absolute; top: 50%; right: calc(100% + 8px); transform: translateY(-50%); width: 260px; max-height: 320px; overflow-y: auto;
+      background: #161b22; border: 1px solid #30363d; border-radius: 8px; box-shadow: 0 12px 34px rgba(0,0,0,0.6); padding: 10px; z-index: 40; display: none; }
+    .vv-co:hover .vv-co-pop { display: block; }
+    .vv-co-pop-h { font-size: 11px; text-transform: uppercase; letter-spacing: .4px; color: #8b949e; margin-bottom: 6px; }
+    .vv-co-trait { font-size: 11.5px; color: #c9d1d9; padding: 4px 0; border-top: 1px solid #21262d; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
+    .vv-co-trait b { color: #e6edf3; display: block; width: 100%; font-size: 11px; }
+    .vv-co-trait span { color: #7ab87a; }
+
+    /* Dragging battalions. Columns that would MIX kinds are marked, not blocked — vanilla mixes too. #reg-drag */
+    .unit-tile { cursor: grab; }
+    .unit-tile.dragging { opacity: .4; cursor: grabbing; }
+    .unit-tile.drop-over { outline: 2px solid #58a6ff; outline-offset: 1px; }
+    .reg-col.drop-ok, .dz-grid-support.drop-ok { background: rgba(63,185,80,0.07); border-radius: 8px; }
+    .reg-col.drop-warn { background: rgba(210,153,34,0.09); border-radius: 8px; }
+    .reg-col.drop-no, .dz-grid-support.drop-no { opacity: .38; }
+
+    /* A placed division is clickable — it pulls back into the form above to be edited. #deploy-edit */
+    .dep-tile { cursor: pointer; }
+    .dep-tile:hover { border-color: #58a6ff; }
+    .dep-tile.editing { outline: 2px solid #58a6ff; outline-offset: 2px; }
+
+    .tpl-ctr-prev { width: 30px; height: 30px; object-fit: contain; display: none; flex: none;
+      background: #0d1117; border: 1px solid #30363d; border-radius: 5px; padding: 1px; }
+
+    .nw-jobs { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 4px 12px; margin-top: 6px; }
+    .nw-job { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #c9d1d9; cursor: pointer; text-transform: none; }
+    .nw-why { color: #58a6ff; font-size: 11.5px; background: rgba(31,111,235,0.08); border-left: 2px solid #1f6feb;
+      padding: 5px 9px; border-radius: 0 5px 5px 0; margin: -4px 0 10px; }
+    .nf-kind-opt { display: flex; align-items: flex-start; gap: 9px; padding: 9px 11px; margin-bottom: 6px;
+      border: 1px solid #30363d; border-radius: 9px; background: #0d1117; cursor: pointer; transition: border-color .12s, background .12s; }
+    .nf-kind-opt:hover { border-color: #4b5563; background: #11161d; }
+    .nf-kind-opt.sel { border-color: #1f6feb; background: rgba(31,111,235,0.10); }
+    .nf-kind-opt input { margin-top: 3px; flex: none; }
+    .nf-kind-opt span { display: flex; flex-direction: column; gap: 2px; }
+    .nf-kind-opt b { color: #e6edf3; font-size: 13px; font-weight: 600; }
+    .nf-kind-opt small { color: #8b949e; font-size: 11.5px; line-height: 1.45; }
+    .dz-meta .army-input { width: 130px; }
+    .dz-meta label.dz-lock { flex-direction: row; align-items: center; gap: 6px; font-size: 12px; color: #c9d1d9; }
+    .dz-stats { background: rgba(13,17,23,0.7); border: 1px solid #21262d; border-radius: 10px; padding: 10px 12px; }
+    .stat-group-h { font-size: 9.5px; text-transform: uppercase; letter-spacing: .7px; color: #6e7681; font-weight: 700; margin: 10px 0 4px; border-bottom: 1px solid rgba(148,163,184,0.12); padding-bottom: 3px; }
+    .stat-group-h:first-child { margin-top: 0; }
+    .stat-row { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 12.5px; }
+    .stat-ico { width: 15px; height: 15px; flex-shrink: 0; }
+    .stat-row .sr-lbl { color: #b9c1cb; flex: 1; }
+    .stat-row .sr-val { font-weight: 700; color: #f0f6fc; font-variant-numeric: tabular-nums; }
+
+    /* Modular designer — blueprint */
+    .bp-body { display: grid; grid-template-columns: 1fr 210px; gap: 16px; align-items: start; }
+    @media (max-width: 1180px) { .bp-body { grid-template-columns: 1fr; } }
+    .bp-canvas { background: rgba(13,17,23,0.55); border: 1px solid #21262d; border-radius: 10px; padding: 14px; }
+    /* The vehicle PICTURE above the modules — the real in-game art (like the game's designer), clickable to
+       change to any tank/plane/ship picture (old or new, any mod or vanilla) via the icon browser. */
+    .bp-photo { position: relative; display: flex; align-items: center; justify-content: center; height: 120px; margin-bottom: 12px; background: radial-gradient(circle at 50% 45%, rgba(63,127,191,0.14), rgba(13,17,23,0.2) 70%); border: 1px solid #21262d; border-radius: 10px; cursor: pointer; overflow: hidden; color: var(--uc);  transition: border-color .15s ease;}
+    .bp-photo:hover { border-color: var(--uc); }
+    .bp-photo-img { display: none; width: 92%; height: 100px; background-repeat: no-repeat; background-position: center; background-size: contain; }
+    .bp-photo-glyph { width: 96px; height: 60px; opacity: 0.85; }
+    .bp-photo-glyph svg { width: 100%; height: 100%; }
+    .bp-photo-hint { position: absolute; right: 9px; bottom: 7px; font-size: 10.5px; font-weight: 700; color: #c9d1d9; background: rgba(1,4,9,0.6); border: 1px solid #30363d; border-radius: 12px; padding: 2px 9px; opacity: 0.85; transition: opacity .15s ease, border-color .15s ease; }
+    .bp-photo:hover .bp-photo-hint { opacity: 1; border-color: var(--uc); }
+    .bp-chassis { position: relative; display: flex; align-items: center; gap: 12px; border: 1px solid var(--uc); border-left: 4px solid var(--uc); border-radius: 8px; background: linear-gradient(90deg, rgba(255,255,255,0.05), transparent); padding: 11px 14px; margin-bottom: 14px; }
+    .bp-ch-type { font-size: 11px; text-transform: uppercase; letter-spacing: .6px; font-weight: 700; color: var(--uc); }
+    .bp-ch-name { font-size: 15px; font-family: monospace; font-weight: 700; color: #f0f6fc; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .bp-dlc-badge { margin-left: auto; font-size: 9px; font-weight: 700; text-transform: none; letter-spacing: .4px; color: #e0b44a; background: rgba(210,153,34,0.16); border-radius: 4px; padding: 1px 5px; }
+    .bp-dlc-badge:empty { display: none; }
+    .bp-slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; }
+    .bp-slot { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; text-align: left; background: #161b22; border: 1px solid #30363d; border-radius: 7px; padding: 7px 9px; cursor: pointer; transition: border-color .12s, background .12s, transform .06s ease; }
+    .bp-slot:hover { border-color: #4b5563; }
+    .bp-slot.filled { border-color: #2f6f4f; background: rgba(46,111,79,0.14); }
+    .bp-slot.req:not(.filled) { border-color: #6e3b3b; background: rgba(110,42,42,0.1); }
+    .bp-slot-name { font-size: 9.5px; color: #8b949e; text-transform: uppercase; letter-spacing: .4px; }
+    .bp-slot-mod { font-size: 12px; font-weight: 700; color: #e6edf3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+    .bp-slot:not(.filled) .bp-slot-mod { color: #6e7681; font-weight: 600; }
+    .bp-stats { background: rgba(13,17,23,0.7); border: 1px solid #21262d; border-radius: 10px; padding: 10px 12px; }
+    /* Module picker popup */
+    .dsg-picker-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 60; align-items: center; justify-content: center; }
+    .mp-box { width: min(560px, 92vw); max-height: 80vh; display: flex; flex-direction: column; background: #161b22; border: 1px solid #30363d; border-radius: 12px; box-shadow: 0 12px 40px rgba(0,0,0,0.5); overflow: hidden; }
+    /* Gentle entrance for the module/icon pickers (scoped to #dsgPicker — the battalion picker #divPicker
+       re-renders its box on every rapid add, so a bare .mp-box rule would re-pop it mid-flow). */
+    @keyframes armyPop { from { opacity: 0; transform: translateY(6px) scale(.985); } to { opacity: 1; transform: none; } }
+    #dsgPicker .mp-box { animation: armyPop .16s ease both; }
+    .mp-head { padding: 12px 16px; border-bottom: 1px solid #21262d; font-size: 13px; color: #c9d1d9; text-transform: capitalize; display: flex; align-items: center; gap: 8px; }
+    .mp-close { margin-left: auto; background: transparent; border: none; color: #8b949e; font-size: 20px; line-height: 1; cursor: pointer; transition: color .15s ease; }
+    .mp-close:hover { color: #f85149; }
+    /* "＋ New module" button in the picker header + the module editor form */
+    .mp-new { margin-left: auto; background: #21262d; border: 1px solid #30363d; color: #c9d1d9; border-radius: 6px; padding: 4px 10px; font-size: 12px; font-weight: 600; cursor: pointer; text-transform: none; transition: background .15s, border-color .15s; }
+    .mp-new:hover { background: #30363d; border-color: #1f6feb; }
+    .me-form { overflow: auto; padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; }
+    .me-lbl { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; color: #adbac7; text-transform: none; }
+    .me-lbl .army-input { width: 100%; box-sizing: border-box; font-weight: 400; }
+    .me-hint { font-size: 11px; font-weight: 400; color: #6e7681; }
+    .me-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .me-stats { border-top: 1px solid #21262d; padding-top: 10px; display: flex; flex-direction: column; gap: 7px; }
+    .me-stats-h { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; color: #c9d1d9; }
+    .me-add { margin-left: auto; background: #21262d; border: 1px solid #30363d; color: #c9d1d9; border-radius: 6px; padding: 3px 9px; font-size: 12px; font-weight: 600; cursor: pointer; transition: background .15s; }
+    .me-add:hover { background: #30363d; }
+    .me-stat-row { display: flex; align-items: center; gap: 7px; }
+    .me-sk { flex: 1; min-width: 0; }
+    .me-sv { width: 96px; flex-shrink: 0; }
+    .me-del { background: transparent; border: 1px solid #30363d; color: #8b949e; border-radius: 6px; width: 28px; height: 30px; flex-shrink: 0; cursor: pointer; font-size: 15px; line-height: 1; transition: background .15s, color .15s, border-color .15s; }
+    .me-del:hover { background: rgba(248,81,73,0.12); color: #f0857a; border-color: #6e2a2a; }
+    .me-actions { border-top: 1px solid #21262d; padding-top: 12px; display: flex; align-items: center; gap: 10px; }
+    .me-status { flex: 1; min-width: 0; font-size: 12px; color: #6e7681; }
+    .me-actions .me-back { margin-left: auto; }
+    /* MIO editor */
+    .mio-box { width: min(640px, 94vw); }
+    .mio-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+    .mio-chip { display: inline-flex; align-items: center; gap: 4px; background: #1f6feb22; border: 1px solid #1f6feb55; color: #c9d1d9; border-radius: 12px; padding: 2px 6px 2px 10px; font-size: 12px; }
+    .mio-chip-x { background: transparent; border: none; color: #8b949e; cursor: pointer; font-size: 14px; line-height: 1; padding: 0 2px; }
+    .mio-chip-x:hover { color: #f85149; }
+    .mio-trait { border: 1px solid #21262d; border-radius: 8px; padding: 10px; margin-bottom: 8px; background: rgba(13,17,23,0.5); }
+    .mio-trait-head { display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: #adbac7; margin-bottom: 6px; }
+    .mio-trait-x { background: transparent; border: 1px solid #6e2a2a; color: #f0857a; border-radius: 6px; padding: 2px 8px; font-size: 11px; cursor: pointer; }
+    .mio-trait-x:hover { background: rgba(248,81,73,0.12); }
+    .mio-tbonus-rows { display: flex; flex-direction: column; gap: 6px; margin-top: 5px; }
+    .mio-brow-x { background: transparent; border: 1px solid #30363d; color: #8b949e; border-radius: 6px; width: 28px; height: 30px; flex-shrink: 0; cursor: pointer; font-size: 15px; line-height: 1; }
+    .mio-brow-x:hover { background: rgba(248,81,73,0.12); color: #f0857a; }
+    .mp-list { overflow: auto; padding: 10px; display: flex; flex-direction: column; gap: 6px; }
+    .mp-mod { display: flex; flex-direction: row; align-items: center; gap: 10px; text-align: left; background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 8px 12px; cursor: pointer; transition: border-color .12s ease, background-color .12s ease, transform .06s ease; }
+    .mp-mod-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    /* Real in-game module icons (GFX_EMI_/GFX_SMI_ single frame) with a ⛭ fallback behind */
+    .mod-ico-wrap { position: relative; width: 42px; height: 32px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; }
+    .mod-ico-fb { position: absolute; font-size: 19px; opacity: 0.4; }
+    .mod-ico { position: relative; max-width: 42px; max-height: 32px; object-fit: contain; }
+    .bp-slot-body { display: flex; align-items: center; gap: 7px; min-width: 0; }
+    .bp-slot-body .mod-ico-wrap { width: 30px; height: 24px; }
+    .bp-slot-body .mod-ico { max-width: 30px; max-height: 24px; }
+    .bp-slot-body .bp-slot-mod { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .mp-mod:hover { border-color: #1f6feb; background: rgba(31,111,235,0.08); }
+    .mp-mod.sel { border-color: #2ea043; background: rgba(46,160,67,0.12); }
+    .mp-mod.mp-blocked { opacity: 0.5; cursor: not-allowed; border-style: dashed; }
+    .mp-mod.mp-blocked:hover { border-color: #30363d; background: #0d1117; }
+    .mp-mod.mp-blocked .mp-mod-stats { color: #d0857a; }
+    /* Icon browser (equipment designer) */
+    .dsg-icon-prev img { width: 26px; height: 26px; object-fit: contain; vertical-align: middle; border: 1px solid #30363d; border-radius: 5px; background: #0d1117; }
+    .ip-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: 8px; max-height: 52vh; overflow: auto; }
+    .ip-item { display: flex; flex-direction: column; align-items: center; gap: 6px; background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 8px 6px; cursor: pointer; transition: border-color .12s ease, background-color .12s ease, transform .06s ease; }
+    .ip-item:hover { border-color: #1f6feb; background: rgba(31,111,235,0.08); }
+    /* A tactile press on the clickable tiles/slots/cards, mirroring the button tiers (never on a blocked module). */
+    .bp-slot:active, .mp-mod:not(.mp-blocked):active, .ip-item:active, .unit-pick:active, .slot-add:active { transform: translateY(1px); filter: brightness(.96); }
+    .ip-img { width: 44px; height: 44px; object-fit: contain; }
+    .ip-name { font-size: 9.5px; color: #8b949e; font-family: monospace; text-align: center; word-break: break-all; line-height: 1.2; }
+    .mp-mod-name { font-size: 13px; font-weight: 600; color: #e6edf3; font-family: monospace; }
+    .mp-abbr { color: #8b949e; font-weight: 400; }
+    .mp-mod-stats { font-size: 11px; color: #8fb0d0; }
+
+    /* Modular designer (legacy dropdown grid — kept for reference) */
+    .dsg-slot-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+    .dsg-slot { display: flex; flex-direction: column; gap: 3px; font-size: 11px; color: #8b949e; }
+    .dsg-slot select { width: 100%; box-sizing: border-box; }
+
+    /* Manufacturers: collapsible + compact. A total conversion ships hundreds, so the list is capped to its own
+       scroll window and grouped by source file rather than run as one endless column. #mio-collapse */
+    .mio-toggle { display:flex; align-items:center; gap:8px; background:none; border:none; padding:0; cursor:pointer; color:inherit; font:inherit; }
+    .mio-toggle:hover .mio-chev, .mio-toggle:hover h3 { color:#58a6ff; }
+    .mio-chev { display:inline-block; width:12px; color:#8b949e; transition:transform .12s ease; font-size:11px; }
+    .mio-toggle[aria-expanded="true"] .mio-chev { transform:rotate(90deg); }
+    .mio-count { color:#6e7681; font-size:12px; font-weight:600; }
+    #mioList { max-height:330px; overflow-y:auto; border:1px solid #232a35; border-radius:6px; padding:4px; }
+    .mio-grp-head { display:flex; align-items:center; gap:8px; width:100%; background:#161b22; border:none; border-radius:4px;
+                    padding:5px 8px; cursor:pointer; color:#c9d1d9; font-size:12px; font-weight:600; text-align:left; margin-top:2px; }
+    .mio-grp-head:hover { background:#1d242e; color:#58a6ff; }
+    .mio-grp-head .mio-chev { font-size:10px; }
+    .mio-grp-head[aria-expanded="true"] .mio-chev { transform:rotate(90deg); }
+    .mio-grp-badge { margin-left:auto; background:#21262d; color:#8b949e; border-radius:9px; padding:0 7px; font-size:11px; }
+    .mio-row { display:flex; align-items:center; gap:8px; padding:3px 8px 3px 22px; font-size:12px; color:#adbac7; border-radius:3px; }
+    .mio-row:hover { background:#1a212b; color:#e6edf3; }
+    .mio-row b { font-weight:600; color:inherit; }
+
+    /* Companies (designer ideas) */
+    .co-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+    .co-slot h3 { display: flex; align-items: center; gap: 8px; }
+    .co-slot .co-count { margin-left: auto; font-size: 11px; color: #8b949e; font-weight: 600; }
+    .co-row { display: flex; align-items: center; gap: 8px; background: #161b22; border: 1px solid #30363d; border-radius: 7px; padding: 7px 10px; margin-bottom: 5px; text-decoration: none; transition: border-color .12s ease, background-color .12s ease; }
+    .co-row:hover { border-color: #4b5563; background: #1c2230; }
+    .co-row .co-name { font-weight: 600; color: #e6edf3; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .co-row .co-id { color: #6e7681; font-size: 10.5px; font-family: monospace; }
+    .co-row .co-edit { color: #58a6ff; font-size: 11px; white-space: nowrap; }
+    .co-ref { color: #6e7681; font-size: 11px; margin-top: 6px; }
+  </style>
+  <link rel="icon" href="favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" href="favicon.png">
+</head>
+<body>
+  <nav class="suite-nav">
+    <a href="home.html" class="suite-nav-link" data-i18n="nav.home">Home</a>
+    <a href="country-setup.html" class="suite-nav-link" data-i18n="nav.countrySetup">Country Setup</a>
+    <a href="characters.html" class="suite-nav-link" data-i18n="nav.characters">Characters</a>
+    <a href="ideas.html" class="suite-nav-link" data-i18n="nav.nationalSpirits">National Spirits</a>
+    <a href="research.html" class="suite-nav-link" data-i18n="nav.researchTree">Research Tree</a>
+    <a href="index.html" class="suite-nav-link" data-i18n="nav.focusTree">Focus Tree</a>
+    <a href="events.html" class="suite-nav-link" data-i18n="nav.events">Events</a>
+    <a href="decisions.html" class="suite-nav-link" data-i18n="nav.decisions">Decisions</a>
+    <a href="map.html" class="suite-nav-link" data-i18n="nav.mapEditor">Map Editor</a>
+    <a href="army.html" class="suite-nav-link active" data-i18n="nav.military">Military</a>
+    <a href="modhealth.html" class="suite-nav-link" data-i18n="nav.modHealth">Mod Health</a>
+
+    <!-- target="_blank" is load-bearing, not decoration. main.js blocks in-window navigation to any
+         non-app origin (will-navigate -> preventDefault + "network blocked" warning), but routes a
+         window-open to an https URL through shell.openExternal. So this opens the user's real browser;
+         a plain href would look like an error. -->
+    <a href="https://discord.gg/Z6P23hjEsM" target="_blank" rel="noopener noreferrer"
+       class="suite-nav-link suite-nav-discord" style="margin-left:auto;"
+       title="Join the Nova Discord — report bugs and ask questions"><svg class="suite-nav-discord-mark" viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true" focusable="false"><path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z"/></svg>Discord</a>
+  </nav>
+
+  <div class="army-container">
+    <div class="army-head">
+      <h1>🪖 Military</h1>
+      <span class="army-sub">Division templates, equipment &amp; designs, and the companies that build them.</span>
+    </div>
+
+    <div class="army-context">
+      <span class="ctx-label">Active mod</span>
+      <select id="armyModSelector" class="army-input" style="min-width:220px; max-width:340px; font-weight:600; padding:6px 10px;"></select>
+      <span id="armyModPath" style="color:#6e7681; font-size:11px; font-family:monospace; word-break:break-all;"></span>
+      <span id="armyModName" style="display:none;"></span>
+    </div>
+    <!-- Same proactive read-only warning every other maker page shows on Vanilla. -->
+    <div id="vanillaBanner" style="display:none; background: linear-gradient(90deg, #2a1800, #1a1000); border: 1px solid #d29922; border-radius: 10px; padding: 10px 16px; margin-bottom: 16px; text-align:center; font-size: 13px; color: #d29922; font-weight: 600;">
+      ⚠️ You are viewing <strong>Vanilla Game Files</strong> (read-only) — you can browse armies and equipment, but saving needs a mod. Select or <a href="home.html" style="color: #58a6ff; text-decoration: underline;">create a mod</a> first.
+    </div>
+
+    <div class="army-subtabs" role="tablist">
+      <button class="army-subtab active" data-tab="divisions" role="tab">🪖 Divisions</button>
+      <button class="army-subtab" data-tab="equipment" role="tab">🔧 Equipment</button>
+      <button class="army-subtab" data-tab="companies" role="tab">🏭 Companies</button>
+    </div>
+
+    <!-- DIVISIONS -->
+    <div class="army-panel active" id="panel-divisions">
+      <div class="army-card" style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+        <h3 style="margin:0;">Country</h3>
+        <select id="armyCountryInput" class="army-input" style="min-width:240px; font-weight:600;"><option value="">— pick a country —</option></select>
+        <button id="armyLoadCountryBtn" class="army-btn-sm" type="button" title="Re-load this country from the mod files (asks first if you have unsaved changes)">↻ Reload</button>
+        <span id="armyCountryStatus" style="color:#8b949e; font-size:12px;"></span>
+        <button id="armySaveBtn" class="army-btn" type="button" style="display:none; margin-left:auto;">💾 Save army</button>
+        <span id="armySaveStatus" style="font-size:12px;"></span>
+      </div>
+
+      <!-- Shown when a country's army is split across DLC branches and this page is editing only one of
+           them. The server has always sent the data for it (landVariants); this page used to ignore it. -->
+      <div id="armyVariantWarn" style="display:none; margin:0 0 10px; font-size:12px; line-height:1.5; color:#f0b429; background:rgba(240,180,41,0.1); border:1px solid rgba(240,180,41,0.35); border-radius:6px; padding:8px 10px;"></div>
+
+      <div class="divisions-layout">
+        <div>
+          <div class="army-card">
+            <div style="display:flex; align-items:center; justify-content:space-between;">
+              <h3 style="margin:0;">Templates</h3>
+              <button id="armyNewTplBtn" class="army-btn-sm" type="button" disabled>＋ New template</button>
+            </div>
+            <div id="armyTemplateList" style="margin-top:10px;"><div class="army-empty">Load a country to see (and edit) its division templates.</div></div>
+          </div>
+        </div>
+        <div class="army-card" id="armyDesigner">
+          <div class="army-empty">Load a country, then select or create a template to build its composition.</div>
+        </div>
+      </div>
+
+      <div class="army-card" id="armyDeployCard" style="display:none;">
+        <h3>Deploy divisions</h3>
+        <p class="card-sub">Place this country's starting divisions. Enter a <b>State ID</b> — Nova drops them in a real land province inside it (its capital / victory point), so the game always gets a valid location. You can also place them by clicking provinces on the <a href="map.html" style="color:#58a6ff;">Map Editor → 🪖 Army tool</a>.</p>
+        <div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; margin-bottom:14px;">
+          <label class="deploy-lbl">Template<select id="deployTemplate" class="army-input" style="min-width:160px;"></select></label>
+          <label class="deploy-lbl">State ID<input id="deployState" class="army-input" type="number" min="1" style="width:110px;" placeholder="e.g. 100" /></label>
+          <button type="button" class="btn btn-sm btn-secondary" id="deployStateBrowseBtn" style="align-self:flex-end; padding:6px 12px; font-size:12px; white-space:nowrap;" title="Browse states — this country's own first">Browse</button>
+          <label class="deploy-lbl">How many<input id="deployCount" class="army-input" type="number" min="1" max="50" value="1" style="width:80px;" /></label>
+          <label class="deploy-lbl">Commander <span style="color:#6e7681;">(optional)</span><input id="deployOfficer" class="army-input" type="text" style="width:150px;" placeholder="e.g. Erwin Rommel" /></label>
+          <!-- #commander-typed-from-memory — the State ID box next door has had a Browse picker since
+               #deploy-state-id-blind-box; this one asked you to remember a general's name and spell it. -->
+          <button type="button" class="btn btn-sm btn-secondary" id="deployOfficerBrowseBtn" style="align-self:flex-end; padding:6px 12px; font-size:12px; white-space:nowrap;" title="Browse this country's generals — with their portraits">Browse</button>
+          <label class="deploy-lbl">Equipment % <span style="color:#6e7681;">(optional)</span><input id="deployEquip" class="army-input" type="number" min="0" max="100" style="width:90px;" placeholder="100" /></label>
+          <label class="deploy-lbl">Experience % <span style="color:#6e7681;">(optional)</span><input id="deployExp" class="army-input" type="number" min="0" max="100" style="width:90px;" placeholder="0" /></label>
+          <button id="deployBtn" class="army-btn-sm" type="button">Deploy here</button>
+          <span id="deployStatus" style="font-size:12px;"></span>
+        </div>
+        <p class="card-sub" style="margin:-6px 0 12px; font-size:11.5px;"><b>Commander</b> and <b>Equipment %</b> are optional. <span class="sb-help" data-help="deploy-extras" title="What do these do?">?</span></p>
+        <div id="deployList"><div class="army-empty">No divisions placed yet.</div></div>
+      </div>
+
+      <div class="army-card army-collapsible" id="armyStockpileCard" data-collapse-key="stockpile" style="display:none;">
+        <h3>🎒 Starting equipment stockpile <span class="sb-help" data-help="stockpile" title="What is this?">?</span></h3>
+        <p class="card-sub">Seed this country's reserve so it <b>starts</b> with equipment on day 1 (<code>add_equipment_to_stockpile</code>) — including your designed named variants. Units draw from this reserve to equip.</p>
+        <div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; margin-bottom:12px;">
+          <label class="deploy-lbl">Equipment type<input id="spType" class="army-input" list="spTypeList" type="text" style="width:200px;" placeholder="e.g. infantry_equipment_1" /><datalist id="spTypeList"></datalist></label>
+          <button type="button" class="btn btn-sm btn-secondary" id="spBrowseBtn" style="align-self:flex-end; padding:6px 12px; font-size:12px; white-space:nowrap;" title="Browse equipment with pictures">Browse</button>
+          <label class="deploy-lbl">Variant name <span style="color:#6e7681;">(optional)</span><input id="spVariant" class="army-input" list="spVariantList" type="text" style="width:160px;" placeholder="pick a named design" autocomplete="off" /><datalist id="spVariantList"></datalist></label>
+          <label class="deploy-lbl">Amount<input id="spAmount" class="army-input" type="number" min="0" step="1" style="width:90px;" placeholder="0" /></label>
+          <label class="deploy-lbl">Producer <span style="color:#6e7681;">(optional)</span><select id="spProducer" class="army-input" style="min-width:150px;"></select></label>
+          <button id="spAddBtn" class="army-btn-sm" type="button">＋ Add</button>
+          <button id="spSaveBtn" class="army-btn" type="button">💾 Save stockpile</button>
+          <span id="spStatus" style="font-size:12px;"></span>
+        </div>
+        <div id="spList"><div class="army-empty">No starting stockpile yet.</div></div>
+      </div>
+
+      <div class="army-card army-collapsible" id="armyNavalAirCard" data-collapse-key="navalair" style="display:none;">
+        <h3>🚢 Navy &amp; ✈️ Air force <span class="sb-help" data-help="navalair" title="What is this?">?</span></h3>
+        <p class="card-sub">Give <b id="naTag">this country</b> a starting <b>navy</b> (fleets → ships) or <b>air force</b> (air wings). Nova writes the order-of-battle file <b>and</b> wires the country to load it. <span id="naCurrent" style="color:#8b949e;"></span></p>
+        <div style="display:flex; gap:8px; margin-bottom:12px;">
+          <button type="button" class="army-btn-sm na-dom na-dom-sel" data-dom="naval">🚢 Navy</button>
+          <button type="button" class="army-btn-sm na-dom" data-dom="air">✈️ Air force</button>
+        </div>
+        <div id="naNavyForm">
+          <div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; margin-bottom:10px;">
+            <label class="deploy-lbl">Fleet name<input id="naFleetName" class="army-input" type="text" style="width:170px;" placeholder="e.g. Home Fleet" /></label>
+            <label class="deploy-lbl">Naval base <span style="color:#6e7681;">(province id)</span><input id="naNavalBase" class="army-input" type="number" min="0" step="1" style="width:130px;" placeholder="e.g. 12364" /></label>
+          </div>
+          <div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; margin-bottom:12px;">
+            <label class="deploy-lbl">Ship name<input id="naShipName" class="army-input" type="text" style="width:150px;" placeholder="e.g. HMS Hood" /></label>
+            <label class="deploy-lbl" title="The ship's ROLE — HOI4 calls this its &quot;definition&quot;: destroyer, carrier, submarine and so on. It is NOT the same as Equipment below, which is the hull. The two must describe the same kind of ship.">Type<input id="naShipDef" class="army-input" list="naDefList" type="text" style="width:120px;" placeholder="destroyer" title="The ship's ROLE — HOI4's &quot;definition&quot;. Click for the list: destroyer, light_cruiser, heavy_cruiser, battle_cruiser, battleship, carrier, submarine." /><datalist id="naDefList"></datalist></label>
+            <label class="deploy-lbl" title="The HULL or named design this ship is BUILT FROM — e.g. destroyer_1, or one of this country's own designs like &quot;Iowa Class&quot;. Type above is the role it plays; this is the thing it is made of. Both are needed, and they must describe the same kind of ship.">Equipment<input id="naShipEq" class="army-input" list="naNavalEqList" type="text" style="width:150px;" placeholder="destroyer_1" title="The HULL or named design this ship is built from. Browse shows every one this country can use, with its stats and modules." /><datalist id="naNavalEqList"></datalist></label>
+            <button type="button" class="btn btn-sm btn-secondary" id="naShipEqBrowseBtn" style="align-self:flex-end; padding:6px 12px; font-size:12px; white-space:nowrap;" title="Browse ships with pictures">Browse</button>
+            <label class="deploy-lbl">Amount<input id="naShipAmount" class="army-input" type="number" min="1" step="1" style="width:78px;" placeholder="1" /></label>
+            <label class="deploy-lbl">Owner<select id="naShipOwner" class="army-input" style="min-width:130px;"></select></label>
+            <button id="naAddShipBtn" class="army-btn-sm" type="button">＋ Add ship</button>
+          </div>
+        </div>
+        <div id="naAirForm" style="display:none;">
+          <div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; margin-bottom:12px;">
+            <label class="deploy-lbl">Air-base state <span style="color:#6e7681;">(state id)</span><input id="naState" class="army-input" type="number" min="0" step="1" style="width:130px;" placeholder="e.g. 278" /></label>
+            <button type="button" class="btn btn-sm btn-secondary" id="naStateBrowseBtn" style="align-self:flex-end; padding:6px 12px; font-size:12px; white-space:nowrap;" title="Browse states — the owner's own first">Browse</button>
+            <label class="deploy-lbl">Aircraft<input id="naAirEq" class="army-input" list="naAirEqList" type="text" style="width:170px;" placeholder="fighter_equipment_1" /><datalist id="naAirEqList"></datalist></label>
+            <button type="button" class="btn btn-sm btn-secondary" id="naAirEqBrowseBtn" style="align-self:flex-end; padding:6px 12px; font-size:12px; white-space:nowrap;" title="Browse aircraft with pictures">Browse</button>
+            <label class="deploy-lbl">Amount<input id="naAirAmount" class="army-input" type="number" min="0" step="1" style="width:78px;" placeholder="0" /></label>
+            <label class="deploy-lbl">Owner<select id="naAirOwner" class="army-input" style="min-width:130px;"></select></label>
+            <button id="naAddGroupBtn" class="army-btn-sm" type="button">＋ Add group</button>
+          </div>
+        </div>
+        <div id="naList" style="margin-bottom:12px;"><div class="army-empty">Add ships (or air groups) above, then Save.</div></div>
+        <div style="display:flex; gap:10px; align-items:center;">
+          <button id="naSaveBtn" class="army-btn" type="button">💾 Save <span id="naSaveDom">navy</span></button>
+          <span id="naStatus" style="font-size:12px;"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- EQUIPMENT -->
+    <div class="army-panel" id="panel-equipment">
+      <div class="army-card" style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+        <h3 style="margin:0;">Equipment &amp; arsenal <span class="sb-help" data-help="equipment-tab" title="What's this tab?">?</span></h3>
+        <span class="card-sub" style="margin:0; flex:1; min-width:180px;">Every weapon, and each country's named variants — grouped by category.</span>
+        <!-- ONE door for making any new equipment. There used to be a second button ("New aircraft + roles")
+             that ran the SAME code with domain="air", purely because the form's Kind selector was unlabelled
+             and nobody found it — plus a third ("+ New chassis") down in the designer. All three now land in
+             this form, which asks what you're making up front. #one-door -->
+        <button id="eqNewFamilyBtn" class="army-btn" type="button">＋ New equipment</button>
+      </div>
+
+      <div class="divisions-layout">
+        <div>
+          <div class="army-card">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+              <input id="eqSearch" class="army-input" type="text" placeholder="Search weapons &amp; variants…" style="flex:1;" />
+              <label style="display:flex; align-items:center; gap:5px; font-size:11.5px; color:#8b949e; white-space:nowrap;" title="Also list the base game's generic equipment types"><input id="eqShowBase" type="checkbox" style="accent-color:#1f6feb;" /> base game</label>
+            </div>
+            <!-- The arsenal filter: every country's named variants ("AH-1 Cobra", "AK-74M"…). Pick one or
+                 more countries to narrow the list; no picks = all countries. -->
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px; flex-wrap:wrap;">
+              <label style="display:flex; align-items:center; gap:5px; font-size:11.5px; color:#8b949e; white-space:nowrap;" title="Named weapons countries actually field — modder-made and yours"><input id="eqShowVariants" type="checkbox" checked style="accent-color:#1f6feb;" /> country variants</label>
+              <select id="eqCountryFilter" class="army-input" style="flex:1; min-width:150px; font-size:12px; padding:5px 8px;"><option value="">🌍 All countries</option></select>
+            </div>
+            <div id="eqCountryChips" style="display:none; gap:5px; flex-wrap:wrap; margin:-4px 0 10px;"></div>
+            <div id="eqList"><div class="army-loading">Loading equipment…</div></div>
+          </div>
+        </div>
+        <div class="army-card" id="eqEditor">
+          <div class="army-empty">Select an equipment on the left, or ＋ New equipment family to create your own.</div>
+        </div>
+      </div>
+
+      <!-- Modular tank/ship/plane designer -->
+      <div class="army-card" id="eqDesignerCard">
+        <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+          <h3 style="margin:0;">🛠️ Design a tank / ship / plane <span class="sb-help" data-help="designer" title="How the designer works">?</span></h3>
+          <span class="card-sub" style="margin:0; flex:1; min-width:160px;">Build a vehicle from parts — pick a chassis, fill its slots, name it, give it to a country.</span>
+          <!-- Was a third door onto the same chassis editor. It now lives behind the one "＋ New equipment"
+               button up top, as the "Modular chassis" choice. #one-door -->
+          <span class="card-sub" style="margin:0;">Need a new frame? Use <b>＋ New equipment</b> above → <b>Modular chassis</b>.</span>
+        </div>
+        <div id="dsgBody" style="margin-top:12px;"><div class="army-loading">Loading chassis &amp; modules…</div></div>
+      </div>
+
+      <!-- Manufacturers (Military Industrial Organizations, AAT) -->
+      <!-- COLLAPSED by default and grouped by file: a total conversion ships hundreds of MIOs (MD: 800+), and a
+           flat always-open list of full-height rows buried the rest of the tab under thousands of pixels. The
+           header carries the count so it stays informative while closed. #mio-collapse -->
+      <!-- The Manufacturers (MIO) EDITOR card used to live here — removed. MIOs are edited on their own
+           page(s); a third editor on the Equipment tab was redundant. The MIO DATA endpoints (/api/mio…)
+           stay, because the per-variant "designed by" company display reads them. #mio-card-removed -->
+
+      <!-- Equipment upgrades (the XP-bought +armour/+speed levels) -->
+      <div class="army-card" id="eqUpgradeCard">
+        <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+          <h3 style="margin:0;">⬆️ Equipment upgrades <span class="sb-help" data-help="upgrade-def" title="What is a custom upgrade?">?</span></h3>
+          <span class="card-sub" style="margin:0; flex:1; min-width:160px;">Define a custom upgrade modders spend army XP on to improve a designed variant. <span id="upgCount" style="color:#8b949e;"></span></span>
+          <button id="upgNewBtn" class="army-btn" type="button">＋ New upgrade</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- COMPANIES -->
+    <div class="army-panel" id="panel-companies">
+      <!-- The full Designers/Companies editor, embedded from National Spirits (designer mode) via a
+           same-origin iframe so the Military tab hosts the exact same well-made maker — no duplicate.
+           src is set lazily on first activation (army.js) so a cold Military open doesn't load it. -->
+      <div id="companiesLoading" class="army-loading" style="padding:48px 12px; text-align:center; font-size:14px;">⏳ Loading the companies editor… <span style="color:#6e7681;">large total-conversion mods can take a few seconds.</span></div>
+      <!-- Full-BLEED (100vw): breaks out of the container's max-width + padding so the embedded editor has the
+           same room as the standalone National Spirits page → identical layout (preview on the side). -->
+      <!-- transparent + borderless: the Military page supplies the background, so the embedded editor reads as
+           part of this tab instead of a second page stacked inside it (see .nova-embed CSS in ideas.html). -->
+      <iframe id="companiesFrame" title="Designers &amp; Companies" style="display:none; width:100vw; position:relative; left:50%; margin-left:-50vw; height:100vh; min-height:420px; border:none; background:transparent;"></iframe>
+    </div>
+  </div>
+
+  <script src="./country-picker.js"></script>
+  <script src="./tech-icon.js?v=4"></script>
+  <script src="./nova-info-modal.js?v=1"></script>
+  <script src="./army.js?v=168"></script>
+</body>
+</html>

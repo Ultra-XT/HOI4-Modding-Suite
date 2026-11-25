@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Character Maker — Nova Modding Suite</title>
+    <!-- Branded "Loading…" veil for slow server scans (mod switch / cold loads). See loading-overlay.js. -->
+    <script src="./nova-i18n.js?v=1"></script>
+    <script src="./nova-bug-report.js?v=2"></script>
+    <script src="./loading-overlay.js?v=oobnote6"></script>
+    <script src="./nova-combo.js?v=5"></script>
+    <link rel="stylesheet" href="./styles.css?v=minimap23" />
+    <style>
+      /* Fill the viewport as a flex column so the editor area gets exactly the leftover
+         height below the dock — instead of hardcoding "100vh - 56px", which cut off the
+         bottom (the General section) whenever the nav/header was taller than 56px (e.g. the
+         nav wrapping to a second line at narrower widths). */
+      html, body { height: 100%; }
+      body { background: #0d1117; color: #c9d1d9; margin: 0; display: flex; flex-direction: column; overflow: hidden; }
+      #topDock { flex: 0 0 auto; }
+      /* Centre the whole page (like Events / National Spirits) instead of packing it against the left edge.
+         THREE columns live here — 300px list + editor + 320px preview — so the cap must fit all of them with
+         slack (1100px squeezed them into overlap). Roomy cap + gaps so the columns breathe instead of butting
+         edge-to-edge; each column reads as its own panel. */
+      .ch-layout { display: flex; flex: 1 1 auto; min-height: 0; width: 100%; max-width: 1560px; margin: 0 auto; gap: 20px; padding: 0 16px; }
+      .ch-list { width: 300px; flex-shrink: 0; border: 1px solid #30363d; border-top: none; border-radius: 0 0 8px 8px; overflow-y: auto; padding: 10px; background: #0b0f14; }
+      .ch-main { flex: 1; min-width: 0; overflow-y: auto; padding: 18px 12px 60px; max-width: 760px; margin: 0 auto; }
+      .ch-toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+      .ch-toolbar select, .ch-input, textarea.ch-input { background: #0d1117; border: 1px solid #30363d; color: #c9d1d9; border-radius: 4px; padding: 6px 9px; font-size: 13px; }
+      .ch-input { width: 100%; box-sizing: border-box; }
+      textarea.ch-input { min-height: 44px; font-family: ui-monospace, monospace; font-size: 12px; }
+      .ch-btn { background: #238636; border: none; color: #fff; border-radius: 5px; padding: 7px 14px; font-size: 13px; font-weight: 600; cursor: pointer; }
+      .ch-btn.secondary { background: #21262d; border: 1px solid #30363d; }
+      .ch-btn.danger { background: #b62324; }
+      .ch-field { margin-bottom: 12px; }
+      .ch-field label { display: block; font-size: 12px; color: #8b949e; margin-bottom: 4px; font-weight: 600; }
+      .ch-row { display: flex; gap: 12px; }
+      .ch-row > .ch-field { flex: 1; }
+      .ch-card { background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 8px 10px; margin-bottom: 6px; cursor: pointer; }
+      .ch-card:hover { border-color: #58a6ff; }
+      .ch-card.active { border-color: #1f6feb; background: #1a2230; }
+      .ch-card .t { font-weight: 600; font-size: 13px; }
+      .ch-card .r { font-size: 11px; color: #8b949e; margin-top: 2px; }
+      .ch-card .f { font-size: 10px; color: #6e7681; font-family: ui-monospace, monospace; }
+      .ch-rolebox { border: 1px solid #30363d; border-radius: 6px; padding: 10px 12px; margin-bottom: 12px; }
+      .ch-rolehead { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 13px; margin-bottom: 8px; cursor: pointer; }
+      .ch-rolebody { display: none; }
+      .ch-rolebox.on .ch-rolebody { display: block; }
+      /* The two chevron-style headers (Portraits, Add-to-a-country) had a static ▸ that never turned, so
+         there was no open/closed cue. Rotate it when the box is open. The checkbox-style role headers use
+         input+label (no bare child span), so they are unaffected. */
+      .ch-rolehead > span:first-child { display: inline-block; transition: transform 0.15s; }
+      .ch-rolebox.on .ch-rolehead > span:first-child { transform: rotate(90deg); }
+      .ch-status { font-size: 12px; margin-left: 8px; }
+      h1 { font-size: 22px; margin: 6px 0; }
+      .ch-hint { color: #8b949e; font-size: 12px; margin: 0 0 14px; }
+
+      /* Character Live Preview Column styling */
+      .ch-preview-panel {
+        width: 320px;
+        background: #11161e;
+        border: 1px solid #30363d; /* full panel border (was border-left only — looked like a stray line once the columns gained gaps) */
+        border-top: none;
+        border-radius: 0 0 8px 8px;
+        padding: 16px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        flex-shrink: 0;
+      }
+      .ch-preview-title {
+        font-size: 13px;
+        color: #8b949e;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        border-bottom: 1px solid #21262d;
+        padding-bottom: 8px;
+        margin-bottom: 4px;
+      }
+      
+      /* In-Game Leader Card Style */
+      .hoi4-leader-card {
+        background: #0d0f13;
+        border: 2px solid #3c3222;
+        border-radius: 4px;
+        padding: 12px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+      }
+      .hoi4-leader-portrait-frame {
+        width: 156px;
+        height: 210px;
+        border: 3px solid #856a42;
+        background: radial-gradient(circle, #2d3848 0%, #151b23 100%);
+        box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        position: relative;
+        margin-bottom: 8px;
+      }
+      .hoi4-leader-portrait-frame img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+      .hoi4-leader-nameplate {
+        background: linear-gradient(180deg, #3a2e1d 0%, #20180d 100%);
+        border: 1px solid #6e5533;
+        width: 90%;
+        padding: 4px 8px;
+        text-align: center;
+        font-family: Georgia, serif;
+        font-size: 13px;
+        font-weight: bold;
+        color: #f7e6c4;
+        border-radius: 2px;
+        margin-bottom: 6px;
+        text-shadow: 1px 1px 2px #000;
+      }
+      .hoi4-leader-ideology {
+        font-size: 11px;
+        color: #8b949e;
+        margin-bottom: 8px;
+        font-weight: 600;
+        text-transform: capitalize;
+        text-align: center;
+      }
+      .hoi4-leader-traits {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        justify-content: center;
+        width: 100%;
+        border-top: 1px dashed #21262d;
+        padding-top: 8px;
+      }
+      
+      /* Advisor Slot Style */
+      .hoi4-advisor-card {
+        background: #0d0f13;
+        border: 2px solid #2f3440;
+        border-radius: 4px;
+        padding: 10px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+      }
+      .hoi4-advisor-portrait-circle {
+        width: 52px;
+        height: 52px;
+        border-radius: 50%;
+        border: 2px solid #856a42;
+        background: #151b23;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+      }
+      .hoi4-advisor-portrait-circle img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+      .hoi4-advisor-info {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .hoi4-advisor-name {
+        font-weight: bold;
+        font-size: 12.5px;
+        color: #e6edf3;
+      }
+      .hoi4-advisor-type {
+        font-size: 10px;
+        color: #58a6ff;
+        font-weight: 600;
+        text-transform: uppercase;
+      }
+      .hoi4-advisor-cost {
+        font-size: 10px;
+        background: rgba(210, 153, 34, 0.15);
+        border: 1px solid rgba(210, 153, 34, 0.3);
+        color: #d29922;
+        padding: 1px 4px;
+        border-radius: 2px;
+        width: fit-content;
+        font-weight: bold;
+      }
+
+      /* Military Leader/General card */
+      .hoi4-general-card {
+        background: #0d0f13;
+        border: 2px solid #1f232b;
+        border-radius: 4px;
+        padding: 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+      }
+      .hoi4-general-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .hoi4-general-portrait-box {
+        width: 60px;
+        height: 80px;
+        border: 2px solid #556270;
+        background: #151b23;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+      }
+      .hoi4-general-portrait-box img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+      .hoi4-general-meta {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+      }
+      .hoi4-general-name {
+        font-weight: bold;
+        font-size: 13px;
+        color: #e6edf3;
+      }
+      .hoi4-general-type {
+        font-size: 10.5px;
+        color: #8b949e;
+        text-transform: capitalize;
+      }
+      .hoi4-general-skill-badge {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        background: linear-gradient(180deg, #ffd700 0%, #b8860b 100%);
+        color: #000;
+        font-weight: 900;
+        padding: 1px 6px;
+        border-radius: 3px;
+        font-size: 10.5px;
+        width: fit-content;
+      }
+      .hoi4-general-stats-row {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 6px;
+        background: #181d26;
+        border: 1px solid #2a3447;
+        border-radius: 3px;
+        padding: 4px;
+        text-align: center;
+      }
+      .hoi4-stat-box {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      .hoi4-stat-label {
+        font-size: 9px;
+        color: #8b949e;
+        text-transform: uppercase;
+        font-weight: bold;
+      }
+      .hoi4-stat-value {
+        font-size: 12px;
+        font-weight: bold;
+        color: #2ea043;
+      }
+      
+      .hoi4-trait-badge {
+        font-size: 10px;
+        background: #242c38;
+        border: 1px solid #3d495d;
+        color: #eab308;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-weight: 600;
+      }
+      
+      /* AI GENERATOR */
+      .ai-generator-panel {
+        background: linear-gradient(145deg, #1c1328, #110d1a);
+        border: 1px solid #482f6e;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 24px;
+      }
+      .ai-generator-panel h3 {
+        margin: 0 0 12px 0;
+        color: #d1b4ff;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+    </style>
+    <link rel="icon" href="favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" href="favicon.png">
+</head>
+  <body>
+    <div id="topDock" class="top-dock">
+      <nav class="suite-nav">
+        <a href="home.html" class="suite-nav-link" data-i18n="nav.home">Home</a>
+        <a href="country-setup.html" class="suite-nav-link" data-i18n="nav.countrySetup">Country Setup</a>
+        <a href="characters.html" class="suite-nav-link active" data-i18n="nav.characters">Characters</a>
+        <a href="ideas.html" class="suite-nav-link" data-i18n="nav.nationalSpirits">National Spirits</a>
+        <a href="research.html" class="suite-nav-link" data-i18n="nav.researchTree">Research Tree</a>
+        <a href="index.html" class="suite-nav-link" data-i18n="nav.focusTree">Focus Tree</a>
+        <a href="events.html" class="suite-nav-link" data-i18n="nav.events">Events</a>
+        <a href="decisions.html" class="suite-nav-link" data-i18n="nav.decisions">Decisions</a>
+        <a href="map.html" class="suite-nav-link" data-i18n="nav.mapEditor">Map Editor</a>
+        <a href="army.html" class="suite-nav-link" data-i18n="nav.military">Military</a>
+        <a href="modhealth.html" class="suite-nav-link" data-i18n="nav.modHealth">Mod Health</a>
+
+        <!-- target="_blank" is load-bearing, not decoration. main.js blocks in-window navigation to any
+             non-app origin (will-navigate -> preventDefault + "network blocked" warning), but routes a
+             window-open to an https URL through shell.openExternal. So this opens the user's real browser;
+             a plain href would look like an error. -->
+        <a href="https://discord.gg/Z6P23hjEsM" target="_blank" rel="noopener noreferrer"
+           class="suite-nav-link suite-nav-discord" style="margin-left:auto;"
+           title="Join the Nova Discord — report bugs and ask questions"><svg class="suite-nav-discord-mark" viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true" focusable="false"><path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z"/></svg>Discord</a>
+      </nav>
+      <header class="app-header">
+        <div class="title-row">
+          <h1>Character Maker</h1>
+          <div class="header-actions">
+            <div class="mod-selector-container" style="display: flex; align-items: center; gap: 8px; margin-right: 16px; background: #21262d; padding: 6px 12px; border-radius: 6px; border: 1px solid #30363d;">
+              <span style="font-size: 12px; color: #8b949e; font-weight: 600; white-space: nowrap;">📁 Active Mod:</span>
+              <select id="headerModSelector" style="background: #0d1117; border: 1px solid #30363d; color: #c9d1d9; border-radius: 4px; padding: 4px 8px; font-size: 12px; outline: none; cursor: pointer; min-width: 150px; max-width: 300px;"></select>
+            </div>
+            <button class="btn" id="saveCharBtn">Save Character</button>
+            <button class="btn btn-secondary" id="duplicateCharBtn" style="margin-left: 8px;" title="Make an editable copy of the loaded character (new token, ready to save)">⧉ Duplicate</button>
+            <button class="btn btn-secondary danger is-hidden" id="deleteCharBtn" style="border-color: #f85149; color: #f85149; margin-left: 8px;">Delete Character</button>
+          </div>
+        </div>
+      </header>
+    </div>
+
+    <div id="vanillaBanner" style="display: none; background: linear-gradient(90deg, #2a1800, #1a1000); border-bottom: 2px solid #d29922; padding: 10px 20px; text-align: center; font-size: 13px; color: #d29922; font-weight: 600;">
+      ⚠️ You are viewing <strong>Vanilla Game Files</strong> (read-only). To save changes, select or <a href="index.html" style="color: #58a6ff; text-decoration: underline;">create a mod</a> first.
+    </div>
+
+    <div class="ch-layout">
+      <!-- Sidebar: list of characters -->
+      <div class="ch-list">
+        <div class="ch-toolbar" style="border-bottom: 1px solid rgba(168, 85, 247, 0.15); padding-bottom: 10px; margin-bottom: 10px;">
+          <button class="ch-btn" id="newCharBtn" style="width: 100%;">+ New Character</button>
+        </div>
+        <div style="padding: 8px; border-bottom: 1px solid rgba(168, 85, 247, 0.15); background: rgba(0, 0, 0, 0.2); margin-bottom: 8px; border-radius: 4px;">
+          <input type="text" id="charsListSearch" placeholder="🔍 Search characters..." style="width: 100%; padding: 6px 12px; background: rgba(22, 27, 34, 0.6); border: 1px solid rgba(168, 85, 247, 0.2); border-radius: 4px; color: #c9d1d9; font-size: 12px; outline: none;" />
+        </div>
+        <div id="charList"></div>
+      </div>
+
+      <div class="ch-main">
+        <h1>🎖️ Character Maker</h1>
+        <p class="ch-hint">Create country leaders, political/military advisors, and generals/admirals. Saves to <code>common/characters/</code>.</p>
+
+        <div class="ai-generator-panel">
+          <h3>✨ AI Character Generator <span id="aiLogicHelpBtn" style="display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; background: #482f6e; color: #d1b4ff; font-size: 11px; cursor: pointer; font-weight: bold;" title="How does this work / How to get API Key?">?</span></h3>
+          <p style="font-size: 13px; color: #a18bbb; margin: 0 0 12px 0;">Describe the character's details (e.g. name, roles, traits, ideology, stats) and the AI will auto-fill the form fields.</p>
+          <textarea id="aiCharPrompt" placeholder="e.g. A fascist country leader and political advisor named Heinrich Becker who is a captain of industry and has warmonger trait" style="width: 100%; padding: 8px; background: #0b0711; border: 1px solid #482f6e; color: #e2d1fa; border-radius: 4px; min-height: 60px; margin-bottom: 8px;"></textarea>
+          <button class="btn" id="generateAiCharBtn" style="background: #5d3b8e; border-color: #8c60ce;">Generate Character Details</button>
+          <span id="aiStatus" style="font-size: 12px; color: #8fa4b8; margin-left: 12px;"></span>
+        </div>
+
+        <div class="ch-row">
+          <div class="ch-field"><label>Character Token (id)</label><input class="ch-input" id="chToken" placeholder="GER_my_character" /></div>
+          <div class="ch-field"><label>Display Name</label><input class="ch-input" id="chName" placeholder="Otto von Example" /></div>
+          <div class="ch-field" style="flex:0 0 120px;"><label>Gender</label><select class="ch-input" id="charGender"><option value="">Male</option><option value="female">Female</option></select></div>
+        </div>
+        <div class="ch-field"><label>Target file (under common/characters)</label><input class="ch-input" id="chFile" value="custom_characters.txt" /></div>
+
+        <!-- DLC variants. Only shown for a character built out of instance = { … } blocks; the fields below
+             then edit the ONE variant selected here, and the others are left exactly as they are. -->
+        <div class="ch-field" id="instanceRow" style="display:none;">
+          <label>DLC variant — this character is defined once per DLC, so pick which one to edit</label>
+          <div id="instanceChips" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+        </div>
+
+        <div class="ch-rolebox" id="boxPortraits">
+          <div class="ch-rolehead" data-box="boxPortraits"><span>▸</span> Portraits (gfx paths, optional)</div>
+          <div class="ch-rolebody">
+            <input type="file" id="portraitFileInput" style="display: none;" accept="image/*" />
+            <div class="ch-row">
+              <div class="ch-field">
+                <label>Civilian large</label>
+                <div style="display: flex; gap: 6px;">
+                  <input class="ch-input" id="pCivLarge" placeholder="GER/large.dds" />
+                  <button class="ch-btn secondary" style="padding: 4px 8px; font-size: 11px; white-space: nowrap;" id="browseCivLarge">Browse</button>
+                  <button class="ch-btn secondary" style="padding: 4px 8px; font-size: 11px; white-space: nowrap;" id="uploadCivLarge">Upload</button>
+                </div>
+              </div>
+              <div class="ch-field">
+                <label>Civilian small</label>
+                <div style="display: flex; gap: 6px;">
+                  <input class="ch-input" id="pCivSmall" placeholder="GER/small.dds" />
+                  <button class="ch-btn secondary" style="padding: 4px 8px; font-size: 11px; white-space: nowrap;" id="browseCivSmall">Browse</button>
+                  <button class="ch-btn secondary" style="padding: 4px 8px; font-size: 11px; white-space: nowrap;" id="uploadCivSmall">Upload</button>
+                </div>
+              </div>
+            </div>
+            <div id="portraitRoleHint" style="display:none; margin: 8px 0 2px; padding: 7px 10px; border-radius: 6px; background: rgba(232,168,73,0.1); border: 1px solid rgba(232,168,73,0.4); color: #e8a849; font-size: 12px; line-height: 1.45;"></div>
+            <div class="ch-row">
+              <div class="ch-field">
+                <label>Army large</label>
+                <div style="display: flex; gap: 6px;">
+                  <input class="ch-input" id="pArmyLarge" placeholder="GER/large.dds" />
+                  <button class="ch-btn secondary" style="padding: 4px 8px; font-size: 11px; white-space: nowrap;" id="browseArmyLarge">Browse</button>
+                  <button class="ch-btn secondary" style="padding: 4px 8px; font-size: 11px; white-space: nowrap;" id="uploadArmyLarge">Upload</button>
+                </div>
+              </div>
+              <div class="ch-field">
+                <label>Army small</label>
+                <div style="display: flex; gap: 6px;">
+                  <input class="ch-input" id="pArmySmall" placeholder="GER/small.dds" />
+                  <button class="ch-btn secondary" style="padding: 4px 8px; font-size: 11px; white-space: nowrap;" id="browseArmySmall">Browse</button>
+                  <button class="ch-btn secondary" style="padding: 4px 8px; font-size: 11px; white-space: nowrap;" id="uploadArmySmall">Upload</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="ch-rolebox" id="boxLeader">
+          <div class="ch-rolehead"><input type="checkbox" id="roleLeader" /> <label for="roleLeader" style="cursor:pointer; user-select:none;">Country Leader</label></div>
+          <div class="ch-rolebody">
+            <div class="ch-row">
+              <div class="ch-field"><label>Ideology (sub-type)</label>
+                <div style="display:flex; gap:6px;">
+                  <input class="ch-input" id="leaderIdeology" placeholder="despotism" style="flex:1 1 auto;" />
+                  <button type="button" id="ideologyPickBtn" class="ch-btn secondary" style="white-space:nowrap;" title="Pick from the ideologies in your active mod">📋 Choose…</button>
+                </div>
+              </div>
+              <div class="ch-field"><label>Expire date</label><input class="ch-input" id="leaderExpire" placeholder="1965.1.1" /></div>
+            </div>
+            <div class="ch-field"><label>Traits (space/newline separated) <button type="button" class="ch-btn secondary trait-browse" data-trait-target="leaderTraits" data-trait-pool="leader" style="padding:2px 8px;font-size:11px;white-space:nowrap;" title="Pick from the real leader traits in your active mod">📋 Browse</button></label><textarea class="ch-input" id="leaderTraits" placeholder="warmonger nervous_leader"></textarea></div>
+          </div>
+        </div>
+
+        <div class="ch-rolebox" id="boxAdvisor">
+          <div class="ch-rolehead"><input type="checkbox" id="roleAdvisor" /> <label for="roleAdvisor" style="cursor:pointer; user-select:none;">Advisor</label></div>
+          <div class="ch-rolebody">
+            <div class="ch-row">
+              <div class="ch-field"><label>Slot</label>
+                <select class="ch-input" id="advisorSlot">
+                  <option value="political_advisor">political_advisor</option>
+                  <option value="army_chief">army_chief</option>
+                  <option value="navy_chief">navy_chief</option>
+                  <option value="air_chief">air_chief</option>
+                  <option value="high_command">high_command</option>
+                  <option value="theorist">theorist</option>
+                </select>
+              </div>
+              <div class="ch-field"><label>Cost (PP)</label><input class="ch-input" id="advisorCost" type="number" value="150" /></div>
+            </div>
+            <div class="ch-row">
+              <div class="ch-field" id="advisorLedgerField"><label>Ledger <span style="color:#8b949e;font-weight:400;font-size:11px;">(military advisors — which unit tab)</span></label>
+                <select class="ch-input" id="advisorLedger">
+                  <option value="">Auto (by slot)</option>
+                  <option value="army">army</option>
+                  <option value="navy">navy</option>
+                  <option value="air">air</option>
+                  <option value="military">military (all)</option>
+                  <option value="civilian">civilian</option>
+                  <option value="hidden">hidden</option>
+                </select>
+              </div>
+              <div class="ch-field"><label>Idea token <span style="color:#8b949e;font-weight:400;font-size:11px;">(optional — defaults to character token)</span></label><input class="ch-input" id="advisorIdeaToken" /></div>
+            </div>
+            <div class="ch-field"><label>Traits <button type="button" class="ch-btn secondary trait-browse" data-trait-target="advisorTraits" data-trait-pool="leader" style="padding:2px 8px;font-size:11px;white-space:nowrap;" title="Advisors use the same trait pool as country leaders">📋 Browse</button></label><textarea class="ch-input" id="advisorTraits" placeholder="smooth_talking_charmer"></textarea></div>
+          </div>
+        </div>
+
+        <div class="ch-rolebox" id="boxGeneral">
+          <div class="ch-rolehead"><input type="checkbox" id="roleGeneral" /> <label for="roleGeneral" style="cursor:pointer; user-select:none;">Military Leader (General / Admiral)</label></div>
+          <div class="ch-rolebody">
+            <div class="ch-field"><label>Type</label>
+              <select class="ch-input" id="generalType">
+                <option value="corps_commander">corps_commander (General)</option>
+                <option value="field_marshal">field_marshal</option>
+                <option value="navy_leader">navy_leader (Admiral)</option>
+              </select>
+            </div>
+            <div class="ch-row">
+              <div class="ch-field"><label>Skill</label><input class="ch-input" id="genSkill" type="number" value="3" /></div>
+              <div class="ch-field"><label>Attack</label><input class="ch-input" id="genAttack" type="number" value="3" /></div>
+              <div class="ch-field"><label>Defense</label><input class="ch-input" id="genDefense" type="number" value="3" /></div>
+              <div class="ch-field"><label id="lblGenPlanning">Planning</label><input class="ch-input" id="genPlanning" type="number" value="2" /></div>
+              <div class="ch-field"><label id="lblGenLogistics">Logistics</label><input class="ch-input" id="genLogistics" type="number" value="2" /></div>
+            </div>
+            <div class="ch-field"><label>Traits <button type="button" class="ch-btn secondary trait-browse" data-trait-target="generalTraits" data-trait-pool="unit" style="padding:2px 8px;font-size:11px;white-space:nowrap;" title="Pick from commander traits valid for this general/admiral type">📋 Browse</button></label><textarea class="ch-input" id="generalTraits" placeholder="inspirational_leader"></textarea></div>
+          </div>
+        </div>
+
+        <!-- Bridge: recruit this character into a specific country's history -->
+        <div class="ch-rolebox" id="boxRecruit">
+          <div class="ch-rolehead" data-box="boxRecruit"><span>▸</span> Add to a country (recruit at game start)</div>
+          <div class="ch-rolebody">
+            <p class="ch-hint" style="margin-top:0;">Save the character first, then pick which country starts with it. This writes <code>recruit_character</code> into that country's history in the active mod.</p>
+            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+              <select id="recruitCountrySelect" class="ch-input" style="min-width:240px; flex:1 1 240px;"></select>
+              <button class="ch-btn" id="recruitAddBtn">Add to country</button>
+              <button class="ch-btn secondary" id="recruitRemoveBtn" style="display:none;">Remove</button>
+            </div>
+            <div id="recruitStatus" style="font-size:12px; margin-top:8px; min-height:16px;"></div>
+          </div>
+        </div>
+
+        <div style="display:flex; gap:10px; align-items:center; margin-top:14px;">
+          <span class="ch-status" id="charStatus"></span>
+        </div>
+      </div>
+
+      <!-- Live Preview Panel -->
+      <div class="ch-preview-panel">
+        <div class="ch-preview-title">📂 Character Preview</div>
+        
+        <!-- Leader Card Preview -->
+        <div id="previewLeaderCard" class="hoi4-leader-card" style="display: none;">
+          <div class="hoi4-leader-portrait-frame">
+            <img id="previewLeaderPortrait" src="/api/vanilla-ui?rel=gfx/interface/ideas/idea_unknown.dds" data-fallback="/api/vanilla-ui?rel=gfx/interface/ideas/idea_unknown.dds" alt="" />
+          </div>
+          <div id="previewLeaderName" class="hoi4-leader-nameplate">New Leader</div>
+          <div id="previewLeaderIdeology" class="hoi4-leader-ideology">Despotism</div>
+          <div id="previewLeaderTraits" class="hoi4-leader-traits">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+        
+        <!-- Advisor Card Preview -->
+        <div id="previewAdvisorCard" class="hoi4-advisor-card" style="display: none;">
+          <div class="hoi4-advisor-portrait-circle">
+            <img id="previewAdvisorPortrait" src="/api/vanilla-ui?rel=gfx/interface/ideas/idea_unknown.dds" data-fallback="/api/vanilla-ui?rel=gfx/interface/ideas/idea_unknown.dds" alt="" />
+          </div>
+          <div class="hoi4-advisor-info">
+            <div id="previewAdvisorName" class="hoi4-advisor-name">New Advisor</div>
+            <div id="previewAdvisorType" class="hoi4-advisor-type">Political Advisor</div>
+            <div id="previewAdvisorCost" class="hoi4-advisor-cost">150 PP</div>
+          </div>
+        </div>
+        
+        <!-- General Card Preview -->
+        <div id="previewGeneralCard" class="hoi4-general-card" style="display: none;">
+          <div class="hoi4-general-header">
+            <div class="hoi4-general-portrait-box">
+              <img id="previewGeneralPortrait" src="/api/vanilla-ui?rel=gfx/interface/ideas/idea_unknown.dds" data-fallback="/api/vanilla-ui?rel=gfx/interface/ideas/idea_unknown.dds" alt="" />
+            </div>
+            <div class="hoi4-general-meta">
+              <div id="previewGeneralName" class="hoi4-general-name">New General</div>
+              <div id="previewGeneralType" class="hoi4-general-type">Corps Commander</div>
+              <div id="previewGeneralSkill" class="hoi4-general-skill-badge">Skill 3</div>
+            </div>
+          </div>
+          <div class="hoi4-general-stats-row">
+            <div class="hoi4-stat-box">
+              <span class="hoi4-stat-label">Att</span>
+              <span id="previewStatAttack" class="hoi4-stat-value">3</span>
+            </div>
+            <div class="hoi4-stat-box">
+              <span class="hoi4-stat-label">Def</span>
+              <span id="previewStatDefense" class="hoi4-stat-value">3</span>
+            </div>
+            <div class="hoi4-stat-box">
+              <span class="hoi4-stat-label">Pla</span>
+              <span id="previewStatPlanning" class="hoi4-stat-value">2</span>
+            </div>
+            <div class="hoi4-stat-box">
+              <span class="hoi4-stat-label">Log</span>
+              <span id="previewStatLogistics" class="hoi4-stat-value">2</span>
+            </div>
+          </div>
+          <div id="previewGeneralTraits" class="hoi4-leader-traits">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+        
+        <!-- No Roles Card Preview -->
+        <div id="previewNoRolesCard" class="hoi4-leader-card" style="display: none;">
+          <div class="hoi4-leader-portrait-frame">
+            <img id="previewNoRolesPortrait" src="/api/vanilla-ui?rel=gfx/interface/ideas/idea_unknown.dds" data-fallback="/api/vanilla-ui?rel=gfx/interface/ideas/idea_unknown.dds" alt="" />
+          </div>
+          <div id="previewNoRolesName" class="hoi4-leader-nameplate">New Character</div>
+          <div style="font-size: 11px; color: #ff7b72; font-weight: bold; text-align: center; text-transform: uppercase;">⚠️ No Roles Defined</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Portrait Picker Modal -->
+    <div id="portraitPickerModal" class="modal" style="display: none; position: fixed; z-index: 10000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.85); backdrop-filter: blur(4px);">
+      <div class="modal-content" style="background-color: #0d1117; margin: 5% auto; padding: 24px; border: 1px solid #30363d; width: 80%; max-width: 800px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+          <h2 style="margin: 0; font-size: 20px; color: #e6edf3;">Browse Portraits</h2>
+          <span id="closePortraitPicker" style="color: #8b949e; float: right; font-size: 28px; font-weight: bold; cursor: pointer; transition: color 0.2s;">&times;</span>
+        </div>
+        <input type="text" id="portraitPickerSearch" placeholder="🔍 Search portraits by tag or name (e.g. ger, general, council, hitler)..." style="width: 100%; padding: 12px; font-size: 14px; background: #161b22; border: 1px solid #30363d; color: #c9d1d9; border-radius: 6px; margin-bottom: 20px; outline: none;" />
+        <div id="portraitPickerGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 16px; max-height: 500px; overflow-y: auto; padding: 4px;"></div>
+      </div>
+    </div>
+
+    <!-- Trait Picker Modal (leader/advisor + commander traits, scanned from the active mod + deps + vanilla) -->
+    <div id="traitPickerModal" class="modal" style="display: none; position: fixed; z-index: 10000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.85); backdrop-filter: blur(4px);">
+      <div class="modal-content" style="background-color: #0d1117; margin: 5% auto; padding: 24px; border: 1px solid #30363d; width: 80%; max-width: 720px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <h2 id="traitPickerTitle" style="margin: 0; font-size: 20px; color: #e6edf3;">Browse Traits</h2>
+          <span id="closeTraitPicker" style="color: #8b949e; font-size: 28px; font-weight: bold; cursor: pointer;">&times;</span>
+        </div>
+        <div id="traitPickerCount" style="font-size: 12px; color: #8b949e; margin-bottom: 10px;"></div>
+        <input type="text" id="traitPickerSearch" placeholder="🔍 Search traits by id…" style="width: 100%; padding: 12px; font-size: 14px; background: #161b22; border: 1px solid #30363d; color: #c9d1d9; border-radius: 6px; margin-bottom: 12px; outline: none;" />
+        <div id="traitCreateBar" style="display:none; margin-bottom: 12px;">
+          <button type="button" id="traitCreateToggle" style="background:#21262d;border:1px solid #30363d;color:#c9d1d9;border-radius:6px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">＋ Create custom trait</button>
+          <div id="traitCreateForm" style="display:none; margin-top:10px; padding:12px; background:#161b22; border:1px solid #30363d; border-radius:8px;">
+            <div style="display:flex; flex-wrap:wrap; gap:10px 14px; align-items:flex-end;">
+              <label style="display:flex;flex-direction:column;gap:3px;font-size:11px;color:#8b949e;">Trait id<input id="ntId" type="text" placeholder="my_blitz_master" style="width:170px;padding:7px 9px;background:#0d1117;border:1px solid #30363d;color:#c9d1d9;border-radius:6px;font-size:13px;font-family:monospace;outline:none;"></label>
+              <label style="display:flex;flex-direction:column;gap:3px;font-size:11px;color:#8b949e;">Commander type<select id="ntType" style="padding:7px 9px;background:#0d1117;border:1px solid #30363d;color:#c9d1d9;border-radius:6px;font-size:13px;outline:none;"><option value="corps_commander">Corps commander (general)</option><option value="field_marshal">Field marshal</option><option value="navy">Admiral</option><option value="land">Any land</option><option value="operative">Operative</option><option value="all">All</option></select></label>
+              <label style="display:flex;flex-direction:column;gap:3px;font-size:11px;color:#8b949e;">Trait type<select id="ntTraitType" style="padding:7px 9px;background:#0d1117;border:1px solid #30363d;color:#c9d1d9;border-radius:6px;font-size:13px;outline:none;"><option value="personality_trait">Personality (innate)</option><option value="assignable_trait">Assignable (buyable)</option><option value="status_trait">Status</option><option value="basic_trait">Basic</option></select></label>
+              <label style="display:flex;flex-direction:column;gap:3px;font-size:11px;color:#8b949e;">Cost <span style="color:#6e7681;">(assignable)</span><input id="ntCost" type="number" min="0" placeholder="—" style="width:80px;padding:7px 9px;background:#0d1117;border:1px solid #30363d;color:#c9d1d9;border-radius:6px;font-size:13px;outline:none;"></label>
+            </div>
+            <div style="font-size:11px;color:#8b949e;margin:12px 0 4px;">Modifiers <span style="color:#6e7681;">(effect key = value, e.g. <code>army_armor_attack_factor</code> = 0.15)</span></div>
+            <div style="display:flex; flex-direction:column; gap:6px;">
+              <div style="display:flex; gap:8px;"><input class="nt-mod-key" list="ntModList" type="text" placeholder="modifier key" style="flex:1;padding:7px 9px;background:#0d1117;border:1px solid #30363d;color:#c9d1d9;border-radius:6px;font-size:12px;font-family:monospace;outline:none;"><input class="nt-mod-val" type="number" step="0.01" placeholder="value" style="width:110px;padding:7px 9px;background:#0d1117;border:1px solid #30363d;color:#c9d1d9;border-radius:6px;font-size:12px;outline:none;"></div>
+              <div style="display:flex; gap:8px;"><input class="nt-mod-key" list="ntModList" type="text" placeholder="modifier key" style="flex:1;padding:7px 9px;background:#0d1117;border:1px solid #30363d;color:#c9d1d9;border-radius:6px;font-size:12px;font-family:monospace;outline:none;"><input class="nt-mod-val" type="number" step="0.01" placeholder="value" style="width:110px;padding:7px 9px;background:#0d1117;border:1px solid #30363d;color:#c9d1d9;border-radius:6px;font-size:12px;outline:none;"></div>
+              <div style="display:flex; gap:8px;"><input class="nt-mod-key" list="ntModList" type="text" placeholder="modifier key" style="flex:1;padding:7px 9px;background:#0d1117;border:1px solid #30363d;color:#c9d1d9;border-radius:6px;font-size:12px;font-family:monospace;outline:none;"><input class="nt-mod-val" type="number" step="0.01" placeholder="value" style="width:110px;padding:7px 9px;background:#0d1117;border:1px solid #30363d;color:#c9d1d9;border-radius:6px;font-size:12px;outline:none;"></div>
+            </div>
+            <datalist id="ntModList"><option value="army_attack_factor"></option><option value="army_defence_factor"></option><option value="army_armor_attack_factor"></option><option value="army_armor_speed_factor"></option><option value="army_org_factor"></option><option value="max_army_group_size"></option><option value="army_speed_factor"></option><option value="navy_max_range_factor"></option><option value="naval_damage_factor"></option><option value="spotting_chance"></option></datalist>
+            <div style="margin-top:12px; display:flex; align-items:center; gap:10px;">
+              <button type="button" id="ntCreateBtn" style="background:#238636;border:1px solid #2ea043;color:#fff;font-weight:700;border-radius:6px;padding:7px 14px;font-size:13px;cursor:pointer;">💾 Create trait</button>
+              <span id="ntStatus" style="font-size:12px;"></span>
+            </div>
+          </div>
+        </div>
+        <div id="traitPickerGrid" style="display: flex; flex-wrap: wrap; gap: 8px; max-height: 460px; overflow-y: auto; padding: 4px;"></div>
+      </div>
+    </div>
+
+    <script src="./nova-ai-parse.js"></script>
+    <script src="./country-picker.js"></script>
+    <script src="./characters.js?v=traitnames36"></script>
+    <script src="./ai-field-assist.js"></script>
+    <script src="./save-shortcut.js?v=2"></script>
+  <script src="./version-banner.js"></script>
+  </body>
+</html>

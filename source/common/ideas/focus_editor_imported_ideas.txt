@@ -1,0 +1,32 @@
+ideas = {
+	country = {
+		custom_spirit_1 = {
+					picture = gfx_idea_slot_aircraft_manufacturer
+						allowed = {
+						always = yes
+						}
+						available = {
+						has_war = no
+						}
+						modifier = {
+						political_power_gain = 0.10
+						stability = 0.05
+						war_support = 0.05
+						research_speed_modifier = 0.03
+						}
+						equipment_bonus = {
+						infantry_weapons = { build_cost_ic = -0.05 }
+						}
+				}
+
+		e2e_test_spirit = {
+					picture = GFX_idea_generic
+						allowed = {
+						always = yes
+						}
+						modifier = {
+						political_power_gain = 0.05
+						}
+						}
+	}
+}

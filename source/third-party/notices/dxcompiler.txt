@@ -1,0 +1,6 @@
+DirectX Shader Compiler (dxcompiler.dll, "Google Dawn Custom Build"
+{dxcompiler.fileVersion}), shipped by Electron.
+https://github.com/microsoft/DirectXShaderCompiler
+Licence: University of Illinois/NCSA Open Source License.
+Copyright (c) 2003-2015 University of Illinois at Urbana-Champaign.
+{licence:DirectXShaderCompiler-LICENSE.txt}

@@ -1,0 +1,7 @@
+THIRD-PARTY NOTICES - Nova Modding Suite {version}
+Generated {date} from the files in this release. Do not edit by hand.
+
+Nova includes components made by others. They belong to their owners
+and are not licensed to you under Nova's licence (LICENSE.txt). Those
+listed here are licensed to you by their authors under the terms given
+below. Nothing in Nova's licence limits any right those terms give you.

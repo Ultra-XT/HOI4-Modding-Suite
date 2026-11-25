@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mod Health — Nova Modding Suite</title>
+    <link rel="stylesheet" href="./styles.css?v=minimap23" />
+    <style>
+      body { background: #0d1117; color: #c9d1d9; }
+      /* Fill the remaining viewport below the nav and scroll internally — the
+         page body has overflow:hidden, so without this the list bottom is unreachable.
+         The scroll container is full-width so its scrollbar sits at the far right edge of
+         the window; the content itself is centered by .mh-inner (max-width 1100px). */
+      .mh-wrap { width: 100%; box-sizing: border-box; flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+      .mh-inner { max-width: 1100px; width: 100%; margin: 0 auto; padding: 16px 20px 60px; box-sizing: border-box; }
+      .mh-toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 8px 0 18px; }
+      .mh-toolbar select { background: #0d1117; border: 1px solid #30363d; color: #c9d1d9; border-radius: 4px; padding: 6px 10px; font-size: 13px; min-width: 220px; }
+      .mh-btn { background: #238636; border: none; color: #fff; border-radius: 5px; padding: 7px 14px; font-size: 13px; font-weight: 600; cursor: pointer; }
+      .mh-btn.secondary { background: #21262d; border: 1px solid #30363d; }
+      .mh-summary { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 18px; }
+      .mh-chip { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 10px 14px; min-width: 92px; }
+      .mh-chip .n { font-size: 22px; font-weight: 700; }
+      .mh-chip .l { font-size: 11px; color: #8b949e; text-transform: uppercase; letter-spacing: .04em; }
+      .mh-chip.err { border-color: #f85149; }
+      .mh-chip.err .n { color: #f85149; }
+      .mh-chip.warn { border-color: #d29922; }
+      .mh-chip.warn .n { color: #d29922; }
+      .mh-chip.ok { border-color: #2ea043; }
+      .mh-chip.ok .n { color: #2ea043; }
+      .mh-section-title { font-size: 15px; font-weight: 700; margin: 22px 0 8px; }
+      .mh-problem { display: flex; gap: 10px; align-items: flex-start; background: #161b22; border: 1px solid #30363d; border-left-width: 4px; border-radius: 6px; padding: 10px 12px; margin-bottom: 8px; }
+      .mh-problem.error { border-left-color: #f85149; }
+      .mh-problem.warning { border-left-color: #d29922; }
+      .mh-problem .ic { font-size: 15px; line-height: 1.4; }
+      .mh-problem .body { flex: 1; min-width: 0; }
+      .mh-problem .msg { font-size: 13px; line-height: 1.5; }
+      .mh-problem .meta { font-size: 11px; color: #8b949e; margin-top: 3px; font-family: ui-monospace, monospace; }
+      .mh-why { margin-top: 6px; }
+      .mh-why > summary { font-size: 11.5px; color: #58a6ff; cursor: pointer; list-style: none; display: inline-flex; align-items: center; gap: 4px; user-select: none; width: fit-content; }
+      .mh-why > summary::-webkit-details-marker { display: none; }
+      .mh-why > summary:hover { text-decoration: underline; }
+      .mh-why[open] > summary { color: #8b949e; }
+      .mh-why-body { font-size: 12px; color: #c9d1d9; line-height: 1.55; margin-top: 5px; padding: 8px 11px; background: #0d1117; border: 1px solid #30363d; border-left: 3px solid #1f6feb; border-radius: 6px; }
+      .mh-empty { color: #2ea043; font-size: 14px; padding: 14px; background: #161b22; border: 1px solid #2ea043; border-radius: 8px; }
+      .mh-loading { color: #8b949e; padding: 20px; font-size: 14px; }
+      .mh-error { color: #f85149; padding: 14px; background: #161b22; border: 1px solid #f85149; border-radius: 8px; }
+      .mh-hint { color: #8b949e; font-size: 12px; margin: 4px 0 0; }
+      .mh-breakdown { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 9px 14px; margin-bottom: 12px; font-size: 12.5px; color: #8b949e; line-height: 1.5; }
+      .mh-breakdown b { color: #c9d1d9; }
+      /* #modhealth-under-development — deliberately loud. This is the one panel in Nova that can damage
+         a mod, so its warning must not read like the decorative hint text below it. */
+      .mh-devnotice { margin: 10px 0 14px; padding: 12px 14px; border-radius: 8px;
+        background: rgba(240, 164, 78, 0.10); border: 1px solid rgba(240, 164, 78, 0.55);
+        border-left: 4px solid #f0a44e; }
+      .mh-devnotice-title { font-weight: 700; color: #f0a44e; font-size: 14px; margin-bottom: 6px; }
+      .mh-devnotice p { margin: 6px 0; font-size: 12.5px; line-height: 1.55; color: #d7d2c8; }
+      .mh-devnotice b { color: #ffd9a8; }
+      .mh-devnotice-foot { color: #9aa4b2 !important; font-size: 11.5px !important; }
+      .mh-fixall { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; background: #0d2818; border: 1px solid #2ea043; border-radius: 8px; padding: 10px 14px; margin-bottom: 12px; font-size: 13px; color: #ade6c0; }
+      .mh-fixall b { color: #56d364; }
+      .mh-fixallbtn { background: #238636; border: 1px solid #2ea043; color: #fff; border-radius: 6px; padding: 6px 14px; font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+      .mh-fixallbtn:hover { background: #2ea043; }
+      .mh-fixallbtn:disabled { opacity: 0.75; cursor: default; }
+      .mh-filter { display: flex; gap: 6px; margin-bottom: 10px; }
+      .mh-filter button { background: #21262d; border: 1px solid #30363d; color: #c9d1d9; border-radius: 999px; padding: 4px 12px; font-size: 12px; cursor: pointer; }
+      .mh-filter button.active { background: #1f6feb; border-color: #1f6feb; color: #fff; }
+      .mh-fixbtn { margin-top: 8px; background: #21262d; border: 1px solid #2ea043; color: #2ea043; border-radius: 6px; padding: 5px 12px; font-size: 12px; font-weight: 600; cursor: pointer; }
+      .mh-fixbtn:hover { background: #2ea043; color: #fff; }
+      .mh-more { margin: 10px 0 4px; padding: 12px 14px; background: #161b22; border: 1px solid #30363d; border-radius: 8px; font-size: 13px; color: #8b949e; text-align: center; }
+      .mh-more b { color: #c9d1d9; }
+      .mh-more button { background: #21262d; border: 1px solid #30363d; color: #c9d1d9; border-radius: 6px; padding: 5px 12px; font-size: 12px; font-weight: 600; cursor: pointer; margin-left: 8px; }
+      .mh-more button:hover { background: #30363d; border-color: #58a6ff; }
+      /* Health score card */
+      .mh-score { display: flex; align-items: center; gap: 18px; background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 16px 20px; margin-bottom: 16px; }
+      .mh-score svg { flex: 0 0 auto; }
+      .mh-score-info h2 { margin: 0 0 3px; font-size: 18px; font-weight: 700; }
+      .mh-score-info p { margin: 0; font-size: 12.5px; color: #8b949e; line-height: 1.5; }
+      .mh-score-info .mh-score-sub b { color: #c9d1d9; }
+      /* Clickable category chips */
+      .mh-cat { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; align-items: center; }
+      .mh-cat .lbl { font-size: 12px; color: #8b949e; font-weight: 600; margin-right: 2px; }
+      .mh-cat button { background: #21262d; border: 1px solid #30363d; color: #c9d1d9; border-radius: 999px; padding: 4px 11px; font-size: 12px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+      .mh-cat button:hover { border-color: #58a6ff; }
+      .mh-cat button.active { background: #1f6feb; border-color: #1f6feb; color: #fff; }
+      .mh-cat button .cnt { font-weight: 700; }
+      .mh-cat button.err-cat .cnt { color: #f85149; }
+      .mh-cat button.active .cnt { color: #fff; }
+      /* Deep-link to the owning maker */
+      .mh-open { margin-top: 8px; display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; color: #58a6ff; text-decoration: none; font-weight: 600; }
+      .mh-open:hover { text-decoration: underline; }
+    </style>
+    <link rel="icon" href="favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" href="favicon.png">
+</head>
+  <body>
+    <div id="topDock" class="top-dock">
+      <nav class="suite-nav">
+        <a href="home.html" class="suite-nav-link" data-i18n="nav.home">Home</a>
+        <a href="country-setup.html" class="suite-nav-link" data-i18n="nav.countrySetup">Country Setup</a>
+        <a href="characters.html" class="suite-nav-link" data-i18n="nav.characters">Characters</a>
+        <a href="ideas.html" class="suite-nav-link" data-i18n="nav.nationalSpirits">National Spirits</a>
+        <a href="research.html" class="suite-nav-link" data-i18n="nav.researchTree">Research Tree</a>
+        <a href="index.html" class="suite-nav-link" data-i18n="nav.focusTree">Focus Tree</a>
+        <a href="events.html" class="suite-nav-link" data-i18n="nav.events">Events</a>
+        <a href="decisions.html" class="suite-nav-link" data-i18n="nav.decisions">Decisions</a>
+        <a href="map.html" class="suite-nav-link" data-i18n="nav.mapEditor">Map Editor</a>
+        <a href="army.html" class="suite-nav-link" data-i18n="nav.military">Military</a>
+        <a href="modhealth.html" class="suite-nav-link active" data-i18n="nav.modHealth">Mod Health</a>
+
+        <!-- target="_blank" is load-bearing, not decoration. main.js blocks in-window navigation to any
+             non-app origin (will-navigate -> preventDefault + "network blocked" warning), but routes a
+             window-open to an https URL through shell.openExternal. So this opens the user's real browser;
+             a plain href would look like an error. -->
+        <a href="https://discord.gg/Z6P23hjEsM" target="_blank" rel="noopener noreferrer"
+           class="suite-nav-link suite-nav-discord" style="margin-left:auto;"
+           title="Join the Nova Discord — report bugs and ask questions"><svg class="suite-nav-discord-mark" viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true" focusable="false"><path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z"/></svg>Discord</a>
+      </nav>
+    </div>
+
+    <div class="mh-wrap">
+     <div class="mh-inner">
+      <h1 style="font-size: 22px; margin: 6px 0;">🩺 Mod Health</h1>
+
+      <!-- #modhealth-under-development — SAY WHAT THIS PANEL IS AND IS NOT.
+           Mod Health is the least finished surface in Nova. An accuracy pass took false positives on
+           Millennium Dawn from 11,506 to 7,140 and on vanilla from 5,922 to 4,458 — a real improvement, and
+           still thousands of reports that are wrong. Worse, "Auto-fix" writes to the modder's files, and a
+           fix derived from a false positive edits content that was never broken.
+           A modder cannot tell which of those two things they are looking at, so the panel has to say so
+           itself, above the results, every time — not in a changelog they will not read. -->
+      <div class="mh-devnotice" role="note">
+        <div class="mh-devnotice-title">⚠️ Mod Health is still under development</div>
+        <p>
+          This panel reports a lot, and <b>a good number of its reports are false positives</b> — content that
+          is perfectly fine in game. Treat what you see here as <b>leads to check</b>, not a defect list.
+        </p>
+        <p>
+          <b>Auto-fix is not ready.</b> It writes to your mod's files, and when it acts on a report that was
+          wrong it can change or remove content that was never broken. <b>We recommend you do not use it.</b>
+          If you do, <b>back up your mod first</b> — every other maker in Nova is safe to use; this one is the
+          exception.
+        </p>
+        <p class="mh-devnotice-foot">
+          The rules are being rewritten mod by mod. Reports of a rule that cries wolf are very welcome — they
+          are exactly what the work needs.
+        </p>
+      </div>
+
+      <p class="mh-hint">Scans your active mod and reports content that won't work in-game — duplicate IDs, missing localization, national spirits nothing grants, and references to things that don't exist.</p>
+
+      <div class="mh-toolbar">
+        <span style="font-size: 12px; color: #8b949e; font-weight: 600;">📁 Active Mod:</span>
+        <select id="modSelector"></select>
+        <button class="mh-btn" id="rescanBtn">Rescan</button>
+        <button class="mh-btn" id="copyReportBtn" title="Copy a plain-text report of every problem — paste it into a forum post, a bug report, or an AI assistant.">📋 Copy report</button>
+      </div>
+
+      <div id="mhScore"></div>
+
+      <div id="summary" class="mh-summary"></div>
+
+      <div id="mhCrashCheck" style="margin:10px 0;"></div>
+
+      <div class="mh-filter" id="filterBar" style="display:none;">
+        <button data-sev="all" class="active">All</button>
+        <button data-sev="error">Errors</button>
+        <button data-sev="warning">Warnings</button>
+        <input type="text" id="mhSearch" placeholder="🔍 Filter by id, message, rule, or file…" autocomplete="off"
+          style="margin-left:auto; flex:0 1 320px; min-width:160px; padding:4px 10px; background:#0d1117; border:1px solid #30363d; color:#c9d1d9; border-radius:999px; font-size:12px; outline:none;" />
+      </div>
+
+      <div id="mhCats" class="mh-cat" style="display:none;"></div>
+
+      <div id="content" class="mh-loading">Loading…</div>
+     </div>
+    </div>
+
+    <script src="./nova-i18n.js?v=1"></script>
+    <script src="./nova-bug-report.js?v=2"></script>
+    <script src="./map-rule-labels.js?v=20"></script>
+    <script src="./modhealth.js"></script>
+    <script src="./modhealth-crashcheck.js?v=9"></script>
+  <script src="./version-banner.js"></script>
+  </body>
+</html>

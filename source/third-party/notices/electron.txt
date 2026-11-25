@@ -1,0 +1,9 @@
+ELECTRON AND CHROMIUM
+
+Nova runs on Electron {electron} (https://github.com/electron/electron),
+which contains Chromium {chrome} and Node.js. Electron's licence is in
+LICENSE.electron.txt, and the licences of Chromium and of the parts it
+contains are in LICENSES.chromium.html, both next to this file and
+exactly as Electron ships them:
+  LICENSE.electron.txt    sha256 {electronLicenseSha256}
+  LICENSES.chromium.html  sha256 {chromiumCreditsSha256}

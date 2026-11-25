@@ -1,0 +1,42 @@
+spriteTypes = {
+  spriteType = {
+    name = "GFX_armored_car1_medium"
+    texturefile = "SteamLibrary/steamapps/common/Hearts of Iron IV/gfx/interface/technologies/armored_car1.dds"
+  }
+  spriteType = {
+    name = "GFX_armored_car1_medium_shine"
+    texturefile = "SteamLibrary/steamapps/common/Hearts of Iron IV/gfx/interface/technologies/armored_car1.dds"
+  }
+  spriteType = {
+    name = "GFX_custom_tech_85619_medium"
+    texturefile = "SteamLibrary/steamapps/common/Hearts of Iron IV/gfx/interface/technologies/custom_tech_85619.dds"
+  }
+  spriteType = {
+    name = "GFX_custom_tech_85619_medium_shine"
+    texturefile = "SteamLibrary/steamapps/common/Hearts of Iron IV/gfx/interface/technologies/custom_tech_85619.dds"
+  }
+  spriteType = {
+    name = "GFX_infantry_weapons_medium"
+    texturefile = "SteamLibrary/steamapps/workshop/content/394360/2777392649/gfx/interface/technologies/custom_tech_7290.dds"
+  }
+  spriteType = {
+    name = "GFX_infantry_weapons_medium_shine"
+    texturefile = "SteamLibrary/steamapps/workshop/content/394360/2777392649/gfx/interface/technologies/custom_tech_7290.dds"
+  }
+  spriteType = {
+    name = "gfx_idea_generic_infantry_weapon_company"
+    texturefile = "SteamLibrary/steamapps/workshop/content/394360/2777392649/gfx/interface/technologies/custom_tech_7290.dds"
+  }
+  spriteType = {
+    name = "gfx_idea_generic_infantry_weapon_company_shine"
+    texturefile = "SteamLibrary/steamapps/workshop/content/394360/2777392649/gfx/interface/technologies/custom_tech_7290.dds"
+  }
+  spriteType = {
+    name = "GFX_computing3_medium"
+    texturefile = "SteamLibrary/steamapps/workshop/content/394360/2777392649/gfx/interface/technologies/computing3.dds"
+  }
+  spriteType = {
+    name = "GFX_computing3_medium_shine"
+    texturefile = "SteamLibrary/steamapps/workshop/content/394360/2777392649/gfx/interface/technologies/computing3.dds"
+  }
+}

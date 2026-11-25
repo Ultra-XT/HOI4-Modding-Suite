@@ -1,0 +1,757 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Event Maker — Nova Modding Suite</title>
+    <!-- Branded "Loading…" veil for slow server scans (mod switch / cold loads). See loading-overlay.js. -->
+    <script src="./nova-i18n.js?v=1"></script>
+    <script src="./nova-bug-report.js?v=2"></script>
+    <script src="./loading-overlay.js?v=oobnote6"></script>
+    <link rel="stylesheet" href="./styles.css?v=minimap25" />
+    <style>
+      .events-layout {
+        display: flex;
+        height: calc(100vh - 65px); /* Subtract top dock height */
+        overflow: hidden;
+      }
+      .events-sidebar {
+        width: 300px;
+        background: #11161e;
+        border-right: 1px solid #2d3440;
+        display: flex;
+        flex-direction: column;
+      }
+      .events-sidebar-header {
+        padding: 12px;
+        background: #1c232d;
+        border-bottom: 1px solid #2d3440;
+      }
+      .events-list {
+        flex: 1;
+        overflow-y: auto;
+        padding: 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .event-item {
+        padding: 8px;
+        background: #1a202a;
+        border: 1px solid #2d3440;
+        border-radius: 4px;
+        cursor: pointer;
+        color: #e6edf3;
+      }
+      .event-item:hover {
+        background: #232c3a;
+        border-color: #58a6ff;
+      }
+      .events-main {
+        flex: 1;
+        padding: 20px;
+        overflow-y: auto;
+        background: #0d1117;
+        display: flex;
+        gap: 24px;
+        align-items: start;
+        justify-content: center;
+      }
+      .event-editor-panel {
+        background: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 8px;
+        padding: 24px;
+        flex: 1;
+        max-width: 760px;
+        margin: 0;
+      }
+      .form-group {
+        margin-bottom: 16px;
+      }
+      .form-group label {
+        display: block;
+        margin-bottom: 6px;
+        color: #c9d1d9;
+        font-weight: 600;
+        font-size: 13px;
+      }
+      .form-group input[type="text"],
+      .form-group textarea,
+      .form-group select {
+        width: 100%;
+        padding: 8px;
+        background: #0d1117;
+        border: 1px solid #30363d;
+        border-radius: 6px;
+        color: #c9d1d9;
+      }
+      .form-group textarea {
+        min-height: 100px;
+        resize: vertical;
+      }
+      .btn {
+        padding: 8px 16px;
+        background: #238636;
+        color: #fff;
+        border: 1px solid rgba(240, 246, 252, 0.1);
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: 600;
+      }
+      .btn:hover {
+        background: #2ea043;
+      }
+      .btn-secondary {
+        background: #21262d;
+      }
+      .btn-secondary:hover {
+        background: #30363d;
+      }
+      
+      .picture-upload-group {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      }
+      #eventPicturePreview {
+        width: 170px;
+        height: 118px;
+        background: #0d1117;
+        border: 1px dashed #30363d;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #8b949e;
+        overflow: hidden;
+      }
+      #eventPicturePreview img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+      }
+      
+      .event-options-container {
+        margin-top: 24px;
+        padding-top: 24px;
+        border-top: 1px solid #30363d;
+      }
+      .event-option {
+        background: rgba(28, 35, 45, 0.6);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 8px;
+        padding: 16px;
+        margin-bottom: 16px;
+        position: relative;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        transition: border-color 0.2s ease, transform 0.2s ease;
+      }
+      .event-option:hover {
+        border-color: rgba(88, 166, 255, 0.4);
+      }
+      .event-option .remove-opt-btn {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        background: transparent;
+        border: none;
+        color: #8b949e;
+        font-size: 18px;
+        cursor: pointer;
+        padding: 4px;
+        line-height: 1;
+        border-radius: 4px;
+        transition: color 0.2s, background-color 0.2s;
+      }
+      .event-option .remove-opt-btn:hover {
+        color: #f85149;
+        background: rgba(248, 81, 73, 0.1);
+      }
+      
+      /* AI GENERATOR */
+      .ai-generator-panel {
+        background: linear-gradient(145deg, #1c1328, #110d1a);
+        border: 1px solid #482f6e;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 24px;
+      }
+      .ai-generator-panel h3 {
+        margin: 0 0 12px 0;
+        color: #d1b4ff;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      /* Live Preview Styling */
+      .event-preview-panel {
+        width: 420px;
+        position: sticky;
+        top: 20px;
+        background: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 8px;
+        padding: 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        flex-shrink: 0;
+      }
+      .event-preview-title {
+        font-size: 13px;
+        color: #8b949e;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .hoi4-event-box {
+        background: linear-gradient(180deg, #e6d8b8 0%, #dcd0ac 100%);
+        border: 3px double #54402a;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+        color: #1a1005;
+        font-family: Georgia, serif;
+        padding: 18px;
+        border-radius: 4px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        position: relative;
+      }
+      .hoi4-event-header {
+        font-size: 16px;
+        font-weight: bold;
+        text-align: center;
+        border-bottom: 2px solid #54402a;
+        padding-bottom: 6px;
+        color: #1f1207;
+      }
+      .hoi4-event-img-frame {
+        width: 100%;
+        height: 130px;
+        background: #2b2118;
+        border: 2px solid #54402a;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+      }
+      .hoi4-event-img-frame img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+      .hoi4-event-desc {
+        font-size: 12.5px;
+        line-height: 1.45;
+        text-align: justify;
+        white-space: pre-wrap;
+        color: #2b1f13;
+      }
+      .hoi4-event-options {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin-top: 4px;
+      }
+      .hoi4-event-opt-btn {
+        background: linear-gradient(180deg, #dfceaa 0%, #cdba95 100%);
+        border: 1.5px solid #54402a;
+        color: #23160a;
+        font-family: Georgia, serif;
+        font-size: 12px;
+        font-weight: bold;
+        padding: 6px 10px;
+        text-align: left;
+        cursor: pointer;
+        border-radius: 3px;
+        transition: background 0.15s;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.2);
+        outline: none;
+      }
+      .hoi4-event-opt-btn:hover {
+        background: #c3b089;
+      }
+
+      /* ── News-event skin ────────────────────────────────────────────────
+         HOI4 shows a NEWS event as a printed "World News" newspaper, not the parchment report popup.
+         We render that authentically: the real event_news_bg art (loaded mod-aware in events.js, so an
+         active mod's reskin is honoured) is the backdrop, and the picture/headline/body/options are
+         positioned over it — photo in the masthead's frame, a centred TYPEWRITER headline, a justified
+         typewriter column, and dark bronze option bars — matching interface/eventwindow.gui (EventWindow_News).
+         Coordinates are the .gui positions over the 528×595 sprite, expressed as percentages. */
+      .hoi4-event-box.is-news {
+        background: #d8ccb0 center/100% 100% no-repeat;
+        border: none;
+        box-shadow: 0 10px 28px rgba(0,0,0,0.65);
+        border-radius: 2px;
+        aspect-ratio: 528 / 595;
+        padding: 0;
+        display: block;
+        position: relative;
+        font-family: "Courier New", Courier, monospace;
+        color: #20180c;
+        gap: 0;
+      }
+      .hoi4-event-box.is-news .hoi4-event-img-frame {
+        position: absolute; left: 11.2%; top: 15.3%; width: 75.6%; height: 26%;
+        background: #b3a585; border: none;
+        box-shadow: inset 0 0 0 1px rgba(60,45,25,0.35);
+      }
+      .hoi4-event-box.is-news .hoi4-event-img-frame img {
+        width: 100%; height: 100%; object-fit: cover;
+        filter: grayscale(0.55) contrast(1.05) sepia(0.12); /* newsprint */
+      }
+      .hoi4-event-box.is-news .hoi4-event-header {
+        position: absolute; left: 6%; right: 6%; top: 43.5%;
+        border-bottom: none; padding: 0; text-align: center;
+        font-weight: 700; font-size: 14px; letter-spacing: 0.3px; color: #1a130a;
+      }
+      .hoi4-event-box.is-news .hoi4-event-desc {
+        position: absolute; left: 7.4%; right: 7.4%; top: 51%; bottom: 23%;
+        overflow: hidden; text-align: justify; white-space: pre-wrap;
+        font-size: 11px; line-height: 1.4; color: #2a2013;
+      }
+      .hoi4-event-box.is-news .hoi4-event-options {
+        position: absolute; left: 12%; right: 12%; bottom: 4.5%; gap: 5px; margin: 0;
+      }
+      /* Dark bronze option bars — the game uses GFX_event_option_entry for BOTH the newspaper and the
+         parchment report window, so both skins share this. */
+      .hoi4-event-box.is-news .hoi4-event-opt-btn,
+      .hoi4-event-box.is-report .hoi4-event-opt-btn {
+        background: linear-gradient(180deg, #5a553c 0%, #43402c 50%, #36331f 100%);
+        border: 1px solid #20201a; color: #e8e0c8; font-family: Georgia, serif;
+        font-weight: 700; font-size: 11px; text-align: center;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.12), 0 1px 2px rgba(0,0,0,0.4);
+        text-shadow: 0 1px 1px rgba(0,0,0,0.5);
+      }
+      .hoi4-event-box.is-news .hoi4-event-opt-btn:hover,
+      .hoi4-event-box.is-report .hoi4-event-opt-btn:hover {
+        background: linear-gradient(180deg, #6a6448 0%, #4d4931 100%);
+      }
+
+      /* ── Report-window skin (country_event & other non-news events) ──────
+         HOI4 shows these as a parchment "report" pinned by a metal binder clip, not a flat card. We render
+         it as a faithful vertical 3-slice of the REAL art (loaded mod-aware into CSS vars by events.js):
+         event_report_top_win (the clip + top edge) → ::before, event_report_tileable_midsection (repeats) →
+         the body background, event_report_bottom_win_2 (the base) → ::after. Matches interface/eventwindow.gui
+         (EventWindow). The content sits above the slices (z-index). */
+      .hoi4-event-box.is-report {
+        background: var(--rep-mid) repeat-y center top;
+        background-size: 100% auto;
+        background-color: #ddcdaa; /* parchment fallback until the slice loads */
+        border: none;
+        border-radius: 0;
+        box-shadow: 0 10px 28px rgba(0,0,0,0.6);
+        padding: 64px 28px 40px 28px; /* clearance for the clip (top) and the base bar (bottom) */
+        position: relative;
+        color: #281a0c;
+        display: flex; flex-flow: row wrap; align-items: flex-start; column-gap: 14px; row-gap: 9px;
+      }
+      .hoi4-event-box.is-report::before {
+        content: ""; position: absolute; left: 0; right: 0; top: 0; height: 80px;
+        background: var(--rep-top) no-repeat top center; background-size: 100% 100%;
+        pointer-events: none; z-index: 0;
+      }
+      .hoi4-event-box.is-report::after {
+        content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 40px;
+        background: var(--rep-bottom) no-repeat bottom center; background-size: 100% 100%;
+        pointer-events: none; z-index: 0;
+      }
+      .hoi4-event-box.is-report > * { position: relative; z-index: 1; }
+      .hoi4-event-box.is-report .hoi4-event-header { color: #1f1207; border-bottom-color: #6b5435; }
+      .hoi4-event-box.is-report .hoi4-event-desc { color: #2b1f13; }
+      /* Real EventWindow layout (interface/eventwindow.gui): the title + description stack full-width, then
+         the bottom section is the event PICTURE on the LEFT with the answer OPTIONS stacked to its RIGHT
+         (options_grid x=215, just right of the ~210px-wide GFX_report_event_xxx picture). This is what makes
+         a HOI4/MD "report" read as a picture-with-side-options, not a text popup with a button underneath. */
+      .hoi4-event-box.is-report .hoi4-event-header { flex: 1 1 100%; }
+      .hoi4-event-box.is-report .hoi4-event-desc { flex: 1 1 100%; }
+      .hoi4-event-box.is-report .hoi4-event-img-frame {
+        flex: 0 0 42%; order: 5; display: block !important; /* the report ALWAYS shows an event picture in-game */
+        height: auto; aspect-ratio: 3 / 2; /* GFX_report_event pictures are ~210x140 */
+        border: 1px solid #6b5435; background: #1a120a; margin: 0;
+      }
+      .hoi4-event-box.is-report .hoi4-event-img-frame img { width: 100%; height: 100%; object-fit: cover; display: block; }
+      .hoi4-event-box.is-report .hoi4-event-options {
+        flex: 1 1 50%; order: 5; align-self: center; margin-top: 0; min-width: 45%;
+      }
+      /* Event-window style picker (the 4 HOI4 event windows) + leader/operative skins. */
+      #eventStylePicker { display:flex; gap:6px; flex-wrap:wrap; }
+      .ev-style-btn { background:#161b22; border:1px solid #30363d; color:#c9d1d9; border-radius:6px; padding:5px 10px; font-size:12px; cursor:pointer; transition:border-color .12s, background .12s; }
+      .ev-style-btn:hover { border-color:#58a6ff; }
+      .ev-style-btn.active { background:linear-gradient(135deg,#1f6feb,#388bfd); border-color:#58a6ff; color:#fff; font-weight:600; }
+      /* ── Military-Leader window (EventWindow_leader): parchment body (.is-report) + the ornate metal
+         GFX_event_leader_frame overlaid around a centred commander portrait. ── */
+      .hoi4-event-box.is-leader .hoi4-event-img-frame {
+        flex:0 0 auto !important; order:2 !important; aspect-ratio:auto !important; /* portrait sits at the LEFT, description to its right (per eventwindow.gui EventWindow_leader), NOT the report's pic-bottom layout */
+        width:120px !important; height:144px !important; left:auto !important; right:auto !important; top:auto !important;
+        margin:2px 0 6px !important; position:relative !important; border:none !important; box-shadow:none !important;
+        display:block !important; /* the framed portrait IS the leader window's identity — always show it, even with no picture */
+        background:#3a2f20 url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 120'><rect width='100' height='120' fill='%233a2f20'/><circle cx='50' cy='40' r='21' fill='%236f5c3e'/><path d='M13 120 C13 82 32 69 50 69 C68 69 87 82 87 120 Z' fill='%236f5c3e'/></svg>") 50% 48% / 76% 82% no-repeat !important;
+      }
+      .hoi4-event-box.is-leader .hoi4-event-img-frame img { position:absolute; left:11%; top:8%; width:78%; height:80%; object-fit:cover; }
+      .hoi4-event-box.is-leader .hoi4-event-img-frame::after {
+        content:""; position:absolute; inset:0; pointer-events:none;
+        background:var(--leader-frame) center/100% 100% no-repeat;
+      }
+      /* Description sits to the RIGHT of the framed portrait (gui: portrait x=33, Description x=198); options full-width below. */
+      .hoi4-event-box.is-leader .hoi4-event-desc { order:3 !important; flex:1 1 46% !important; min-width:44% !important; align-self:center !important; text-align:left !important; }
+      .hoi4-event-box.is-leader .hoi4-event-options { order:4 !important; flex:1 1 100% !important; }
+
+      /* ── Operative window (EventWindow_Operative): its OWN intelligence-dossier backdrop — frame 0 of the
+         24-frame event_operative_bg strip via the 2400% crop. That frame is a warm-BEIGE manila folder (paper
+         clip at top, agency seal, classified striping) — NOT a dark window — so the text/portrait are themed
+         DARK-on-beige to stay readable, typewriter font (a typed report), the clipped agent photo pinned at the
+         TOP under the clip. Option bars stay the shared GFX_event_option_entry sprite (as in-game). ── */
+      .hoi4-event-box.is-operative {
+        aspect-ratio:528 / 596; /* each frame is 528x596 — match it so the frame-0 (2400%) crop stays undistorted */
+        background-color:#d9c9a8; /* warm-beige dossier fallback so the dark text is readable even before the sprite paints */
+        background-size:2400% 100% !important; background-position:0 0 !important; background-repeat:no-repeat !important;
+        border:1px solid #b09a74; border-radius:3px; box-shadow:0 10px 28px rgba(0,0,0,0.55);
+        padding:34px 30px 16px; position:relative; color:#2a1d0d; font-family:"Courier New", Courier, monospace;
+        display:flex; flex-direction:column; align-items:center; gap:7px; overflow:hidden;
+      }
+      .hoi4-event-box.is-operative .hoi4-event-options { width:100%; margin-top:auto; }
+      .hoi4-event-box.is-operative .hoi4-event-img-frame {
+        order:-1; /* the clipped agent photo sits at the TOP, under the dossier's paper clip */
+        width:104px !important; height:130px !important; left:auto !important; right:auto !important; top:auto !important;
+        margin:0 auto 6px !important; position:relative !important; border:1px solid #6b5535;
+        box-shadow:0 3px 9px rgba(0,0,0,0.4); display:block !important; /* always show the clipped agent portrait */
+        background:#4a3b24 url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 120'><rect width='100' height='120' fill='%234a3b24'/><circle cx='50' cy='40' r='21' fill='%237a6242'/><path d='M13 120 C13 82 32 69 50 69 C68 69 87 82 87 120 Z' fill='%237a6242'/></svg>") center/cover no-repeat !important;
+      }
+      .hoi4-event-box.is-operative .hoi4-event-img-frame img { width:100%; height:100%; object-fit:cover; }
+      .hoi4-event-box.is-operative .hoi4-event-header { border:none; padding:0; text-align:center; font-weight:700; font-size:13px; color:#241a0a; letter-spacing:.4px; }
+      .hoi4-event-box.is-operative .hoi4-event-desc { color:#3a2c18; font-size:11px; line-height:1.45; text-align:center; }
+
+      /* ── GUI-DRIVEN preview ───────────────────────────────────────────────
+         When Nova can read the active mod's eventwindow.gui (/api/events/window-layouts), the box becomes a
+         scaled "stage": a container sized to the real window (W×H gui units) with every element absolutely
+         positioned at its REAL gui coordinate, then uniformly transform:scale()d to fit the panel. This makes
+         the preview match ANY mod's actual event-window style, not a hardcoded skin. The old .is-* skins remain
+         as the fallback when the gui can't be read. ── */
+      .hoi4-event-box.ev-gui { background:none !important; border:none !important; box-shadow:none !important; padding:0 !important; margin:0; width:100%; display:block !important; color:#2a1d0d; aspect-ratio:auto !important; overflow:visible; }
+      .ev-stage-wrap { position:relative; width:100%; }
+      .ev-stage { position:absolute; top:0; left:0; transform-origin:top left; }
+      .ev-stage .ev-deco { position:absolute; pointer-events:none; background-repeat:no-repeat; background-size:100% 100%; }
+      /* Shown only when a sprite could not be converted. Without it the stage renders transparent and the
+         headline and body are drawn at #111 on a dark page - unreadable, and identical to "this mod has no
+         newspaper". The paper floor is set inline by markStageArtFailed so it can be cleared per render. */
+      .ev-stage .ev-art-failed-note {
+        position:absolute; left:0; right:0; bottom:0; z-index:9;
+        padding:6px 10px; font-size:11px; line-height:1.35; text-align:center;
+        color:#5c4a2a; background:rgba(216,204,176,0.94); border-top:1px solid rgba(92,74,42,0.35);
+      }
+      .ev-stage #previewEventTitle, .ev-stage #previewEventDesc {
+        position:absolute; margin:0; border:none !important; background:none !important; padding:0;
+        white-space:pre-wrap; overflow:hidden; font-family:"Courier New", Courier, monospace; color:#2a1d0d;
+        box-sizing:border-box; line-height:1; text-shadow:0 1px 0 rgba(255,255,255,0.18);
+      }
+      .ev-stage .hoi4-event-img-frame {
+        position:absolute; margin:0 !important; border:none !important; background:none !important;
+        box-shadow:none !important; overflow:visible; width:auto !important; height:auto !important;
+        aspect-ratio:auto !important; display:block !important; padding:0 !important;
+      }
+      .ev-stage .hoi4-event-img-frame img {
+        position:static !important; width:auto !important; height:auto !important; max-width:none !important;
+        max-height:none !important; object-fit:fill !important; left:auto !important; top:auto !important; display:block;
+      }
+      .ev-stage .hoi4-event-img-frame::after { display:none !important; content:none !important; }
+      .ev-stage #previewEventOptions { position:absolute; display:flex; flex-direction:column; margin:0; gap:3px; }
+      .ev-stage #previewEventOptions .hoi4-event-opt-btn {
+        /* HOI4 option text is the hoi_20bs font = white (0xffffffff), drawn on the dark option-entry sprite. */
+        color:#f5f1e8; font-family:"Courier New", Courier, monospace; font-weight:700; border:none; border-radius:0;
+        box-shadow:none; text-align:center; display:flex; align-items:center; justify-content:center; padding:0 10px;
+        /* NOT nowrap/ellipsis. HOI4 wraps this label to two lines in a 340x40 box (hoi_20bs, lineHeight 20)
+           that is deliberately wider than the 300px sprite, because the entry declares clipping = no. The old
+           declarations did not even do what they looked like: text-overflow does not apply to the anonymous
+           flex item this text becomes, so no ellipsis was ever drawn -- and with justify-content:center the
+           label was clipped at BOTH ends, silently. The author saw a fragment with nothing marking it as one. */
+        white-space:normal; overflow:hidden; line-height:1; text-shadow:0 1px 1px rgba(0,0,0,0.55);
+      }
+    </style>
+    <link rel="icon" href="favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" href="favicon.png">
+</head>
+  <body>
+    <div id="topDock" class="top-dock">
+      <nav class="suite-nav">
+        <a href="home.html" class="suite-nav-link" data-i18n="nav.home">Home</a>
+        <a href="country-setup.html" class="suite-nav-link" data-i18n="nav.countrySetup">Country Setup</a>
+        <a href="characters.html" class="suite-nav-link" data-i18n="nav.characters">Characters</a>
+        <a href="ideas.html" class="suite-nav-link" data-i18n="nav.nationalSpirits">National Spirits</a>
+        <a href="research.html" class="suite-nav-link" data-i18n="nav.researchTree">Research Tree</a>
+        <a href="index.html" class="suite-nav-link" data-i18n="nav.focusTree">Focus Tree</a>
+        <a href="events.html" class="suite-nav-link active" data-i18n="nav.events">Events</a>
+        <a href="decisions.html" class="suite-nav-link" data-i18n="nav.decisions">Decisions</a>
+        <a href="map.html" class="suite-nav-link" data-i18n="nav.mapEditor">Map Editor</a>
+        <a href="army.html" class="suite-nav-link" data-i18n="nav.military">Military</a>
+        <a href="modhealth.html" class="suite-nav-link" data-i18n="nav.modHealth">Mod Health</a>
+
+        <!-- target="_blank" is load-bearing, not decoration. main.js blocks in-window navigation to any
+             non-app origin (will-navigate -> preventDefault + "network blocked" warning), but routes a
+             window-open to an https URL through shell.openExternal. So this opens the user's real browser;
+             a plain href would look like an error. -->
+        <a href="https://discord.gg/Z6P23hjEsM" target="_blank" rel="noopener noreferrer"
+           class="suite-nav-link suite-nav-discord" style="margin-left:auto;"
+           title="Join the Nova Discord — report bugs and ask questions"><svg class="suite-nav-discord-mark" viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true" focusable="false"><path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z"/></svg>Discord</a>
+      </nav>
+      <header class="app-header">
+        <div class="title-row">
+          <h1>HOI4 Event Maker</h1>
+          <div class="header-actions">
+            <div class="mod-selector-container" style="display: flex; align-items: center; gap: 8px; margin-right: 16px; background: #21262d; padding: 6px 12px; border-radius: 6px; border: 1px solid #30363d;">
+              <span style="font-size: 12px; color: #8b949e; font-weight: 600; white-space: nowrap;">📁 Active Mod:</span>
+              <select id="headerModSelector" style="background: #0d1117; border: 1px solid #30363d; color: #c9d1d9; border-radius: 4px; padding: 4px 8px; font-size: 12px; outline: none; cursor: pointer; min-width: 150px; max-width: 300px;"></select>
+            </div>
+            <button class="btn" id="saveEventBtn">Save Event</button>
+            <button class="btn btn-secondary" id="duplicateEventBtn" style="margin-left: 8px;" title="Make an editable copy of the loaded event (new id, ready to save)">⧉ Duplicate</button>
+            <button class="btn btn-secondary is-hidden" id="deleteEventBtn" style="border-color: #f85149; color: #f85149; margin-left: 8px;">Delete Event</button>
+          </div>
+        </div>
+      </header>
+    </div>
+
+    <div id="vanillaBanner" style="display: none; background: linear-gradient(90deg, #2a1800, #1a1000); border-bottom: 2px solid #d29922; padding: 10px 20px; text-align: center; font-size: 13px; color: #d29922; font-weight: 600;">
+      ⚠️ You are viewing <strong>Vanilla Game Files</strong> (read-only). To save changes, select or <a href="index.html" style="color: #58a6ff; text-decoration: underline;">create a mod</a> first.
+    </div>
+
+    <div class="events-layout">
+      <div class="events-sidebar">
+        <div class="events-sidebar-header">
+          <button class="btn btn-secondary" id="newEventBtn" style="width: 100%;">+ Create New Event</button>
+        </div>
+        <div style="padding: 8px; border-bottom: 1px solid #2d3440; background: #141b24;">
+          <input type="text" id="eventsListSearch" placeholder="🔍 Search events..." style="width: 100%; padding: 6px 12px; background: #0d1117; border: 1px solid #30363d; border-radius: 4px; color: #c9d1d9; font-size: 12px; outline: none;" />
+        </div>
+        <div class="events-list" id="eventsList">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+      
+      <div class="events-main">
+        <div class="event-editor-panel">
+          
+          <div class="ai-generator-panel">
+            <h3>✨ AI Event Logic Generator <span id="aiLogicHelpBtn" style="display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; background: #482f6e; color: #d1b4ff; font-size: 11px; cursor: pointer; font-weight: bold;" title="How does this work / How to get API Key?">?</span></h3>
+            <p style="font-size: 13px; color: #a18bbb; margin: 0 0 12px 0;">Describe what this event should do, and the AI will write the exact Paradox script for you.</p>
+            <textarea id="aiEventPrompt" placeholder="e.g. A political crisis where the player can choose to lose 10% stability but gain 50 political power, or lose 50 political power but gain a national spirit." style="width: 100%; padding: 8px; background: #0b0711; border: 1px solid #482f6e; color: #e2d1fa; border-radius: 4px; min-height: 60px; margin-bottom: 8px;"></textarea>
+            <button class="btn" id="generateAiEventBtn" style="background: #5d3b8e; border-color: #8c60ce;">Generate Event Scripts</button>
+            <span id="aiStatus" style="font-size: 12px; color: #8fa4b8; margin-left: 12px;"></span>
+          </div>
+
+          <!-- Event Info summary: appears when you click an existing event — its flags (major / hidden / …),
+               who sees it, and WHAT fires it (which focus, decision, on-action, scripted GUI, or other event).
+               Collapsible (native <details>), but open by default. -->
+          <details id="eventInfoCard" open style="display:none; background:#0d1117; border:1px solid #30363d; border-left:3px solid #58a6ff; border-radius:6px; padding:10px 12px; margin-bottom:14px;">
+            <summary style="cursor:pointer; font-size:11px; font-weight:700; color:#8b949e; text-transform:uppercase; letter-spacing:.5px; user-select:none;">📋 Event Info <span style="font-weight:400; text-transform:none; color:#6e7681;">(click to collapse)</span></summary>
+            <div style="margin-top:8px;">
+              <div id="eventInfoFlags" style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px;"></div>
+              <div id="eventInfoTriggers" style="font-size:12px; color:#c9d1d9; line-height:1.65;"></div>
+            </div>
+          </details>
+
+          <div class="form-group">
+            <label>Namespace (e.g. my_mod_events)</label>
+            <input type="text" id="eventNamespace" value="custom_events" />
+          </div>
+          
+          <div class="form-group" style="display: flex; gap: 16px;">
+            <div style="flex: 1;">
+              <label>Event ID (e.g. 1)</label>
+              <input type="text" id="eventId" value="1" />
+            </div>
+            <div style="flex: 1;">
+              <label>Event Type</label>
+              <select id="eventType">
+                <option value="country_event">Country Event</option>
+                <option value="news_event">News Event</option>
+                <option value="state_event">State Event</option>
+                <option value="unit_leader_event">Unit Leader Event</option>
+                <option value="operative_leader_event">Operative Event</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Title Text</label>
+            <input type="text" id="eventTitle" placeholder="The Fall of the Government" />
+            <div id="eventTitleRendered" class="nova-loc-hint" style="display:none; margin-top:4px; font-size:11px; color:#8b949e;"></div>
+            <div id="eventTitleDynamicHint" style="display:none; font-size:11px; color:#8b949e; margin-top:4px; line-height:1.4;"></div>
+          </div>
+
+          <div class="form-group">
+            <label>Description Text</label>
+            <textarea id="eventDescription" placeholder="A long description of the event..."></textarea>
+            <div id="eventDescDynamicHint" style="display:none; font-size:11px; color:#8b949e; margin-top:4px; line-height:1.4;"></div>
+          </div>
+
+          <div class="form-group">
+            <label>Event Picture (DDS or Upload PNG/JPG)</label>
+            <div class="picture-upload-group">
+              <div id="eventPicturePreview">No Picture</div>
+              <div style="display: flex; flex-direction: column; gap: 8px;">
+                <input type="text" id="eventPictureId" placeholder="e.g. GFX_report_event_custom" />
+                <input type="file" id="eventPictureUpload" accept="image/png, image/jpeg" style="display: none;" />
+                <div style="display: flex; gap: 8px;">
+                  <button class="btn btn-secondary" id="eventPictureUploadBtn" style="flex: 1;">Upload New Image</button>
+                  <button class="btn btn-secondary" id="eventBrowseImageBtn" style="flex: 1; background: #1f2937; border-color: #374151;">Browse Images</button>
+                </div>
+                <span id="uploadStatus" style="font-size: 11px; color: #8b949e;">Upload a PNG to auto-convert to DDS</span>
+              </div>
+            </div>
+          </div>
+          
+          <div class="form-group" style="display: flex; flex-direction: column; gap: 12px;">
+            <div>
+              <label style="margin: 0 0 6px; font-weight: 500; display:block;">Which countries does this event belong to? <span style="font-weight:400; color:#8b949e;">(one, several, or none)</span></label>
+              <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                <select id="eventOwnerPicker" style="padding: 5px; background: #0d1117; border: 1px solid #30363d; color: #c9d1d9; border-radius: 4px; font-size: 12px; min-width: 220px; flex: 1 1 220px;"></select>
+                <button type="button" id="eventOwnerAdd" class="btn btn-secondary" style="padding: 5px 10px; font-size: 12px;">+ Add country</button>
+              </div>
+              <div id="eventOwnerChips" style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px;"></div>
+            </div>
+            <div>
+              <label style="margin: 0 0 6px; font-weight: 500; display:block;">When does it fire? <span style="font-weight:400; color:#8b949e;">(type the in-game date — leave it on the start date to fire on day one)</span></label>
+              <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap; color: #c9d1d9; font-size: 13px;">
+                <input type="text" id="eventDateYear" inputmode="numeric" maxlength="4" placeholder="1939" title="Year" style="width: 62px; padding: 6px; background: #0d1117; border: 1px solid #30363d; color: #c9d1d9; border-radius: 4px; font-weight: 600; font-size: 13px; text-align:center;" />
+                <span style="color:#6e7681;">.</span>
+                <input type="text" id="eventDateMonth" inputmode="numeric" maxlength="2" placeholder="1" title="Month (1-12)" style="width: 42px; padding: 6px; background: #0d1117; border: 1px solid #30363d; color: #c9d1d9; border-radius: 4px; font-weight: 600; font-size: 13px; text-align:center;" />
+                <span style="color:#6e7681;">.</span>
+                <input type="text" id="eventDateDay" inputmode="numeric" maxlength="2" placeholder="1" title="Day (1-31)" style="width: 42px; padding: 6px; background: #0d1117; border: 1px solid #30363d; color: #c9d1d9; border-radius: 4px; font-weight: 600; font-size: 13px; text-align:center;" />
+                <span style="color:#8b949e; margin-left:4px;">at</span>
+                <input type="text" id="eventDateHour" inputmode="numeric" maxlength="2" placeholder="0" title="Hour (0-23)" style="width: 42px; padding: 6px; background: #0d1117; border: 1px solid #30363d; color: #c9d1d9; border-radius: 4px; font-weight: 600; font-size: 13px; text-align:center;" />
+                <span style="color:#8b949e;">:00</span>
+              </div>
+              <div id="eventDateHint" style="font-size: 12px; margin-top: 5px; min-height: 16px; color: #6e7681;"></div>
+            </div>
+            <div id="eventBridgeStatus" style="font-size: 12px; min-height: 16px; color: #8b949e;"></div>
+          </div>
+
+          <div class="form-group">
+            <label>Is Triggered Only?</label>
+            <select id="eventTriggeredOnly">
+              <option value="yes">Yes — only fires when something calls it (a focus, decision, or another event)</option>
+              <option value="no">No — fires on its own over time (set the timing below)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Event Flags</label>
+            <div style="display: flex; gap: 18px; flex-wrap: wrap; padding: 4px 0;">
+              <label style="display:flex;align-items:center;gap:6px;margin:0;font-weight:500;cursor:pointer;"><input type="checkbox" id="eventHidden" style="width:15px;height:15px;accent-color:#2ea043;cursor:pointer;" /> Hidden (no popup)</label>
+              <label style="display:flex;align-items:center;gap:6px;margin:0;font-weight:500;cursor:pointer;"><input type="checkbox" id="eventFireOnce" style="width:15px;height:15px;accent-color:#2ea043;cursor:pointer;" /> Fire only once</label>
+              <label style="display:flex;align-items:center;gap:6px;margin:0;font-weight:500;cursor:pointer;"><input type="checkbox" id="eventMajor" style="width:15px;height:15px;accent-color:#2ea043;cursor:pointer;" /> Major event</label>
+            </div>
+          </div>
+
+          <details class="form-group" style="border: 1px solid #30363d; border-radius: 6px; padding: 8px 12px;">
+            <summary style="cursor: pointer; font-weight: 700; color: #8b949e; user-select: none;">⚙ Advanced — triggers &amp; timing (optional)</summary>
+            <p style="font-size: 12px; color: #8b949e; margin: 8px 0 12px;">Optional, for power users. A triggered event with options works fine without any of these.</p>
+            <div class="form-group">
+              <label>About how many days until it fires on its own?</label>
+              <input type="number" id="eventMtthDays" value="0" min="0" />
+              <div style="font-size: 11px; color: #6e7681; margin-top: 4px;">Only matters if "Is Triggered Only?" is set to <strong>No</strong>. The game waits roughly this many days (with some randomness), then fires the event — e.g. 30 ≈ about a month. Leave 0 if the event is triggered by something else.</div>
+            </div>
+            <div class="form-group">
+              <label>Trigger — conditions required for this event to be able to fire</label>
+              <textarea id="eventTrigger" placeholder="e.g.&#10;has_war = no&#10;has_completed_focus = some_focus"></textarea>
+              <div class="genesis-preview" id="eventTriggerPreview" style="display:none;"></div>
+            </div>
+            <div class="form-group">
+              <label>Immediate — effects that run the instant the event fires (before the player chooses)</label>
+              <textarea id="eventImmediate" placeholder="e.g.&#10;add_political_power = 25&#10;set_country_flag = my_flag"></textarea>
+              <div class="genesis-preview" id="eventImmediatePreview" style="display:none;"></div>
+            </div>
+            <div class="form-group">
+              <label>After — effects that run once the player has chosen an option</label>
+              <textarea id="eventAfter" placeholder="e.g.&#10;add_stability = 0.05"></textarea>
+              <div class="genesis-preview" id="eventAfterPreview" style="display:none;"></div>
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+              <label>Auto-pick timeout (days)</label>
+              <input type="number" id="eventTimeoutDays" value="0" min="0" />
+              <div style="font-size: 11px; color: #6e7681; margin-top: 4px;">For events that shouldn't wait forever: after this many days the game auto-selects the first option (the default is 13 in-game). Mostly used for <strong>hidden</strong> or time-sensitive events. Leave 0 to omit.</div>
+            </div>
+          </details>
+
+          <div class="event-options-container" id="eventOptionsContainer">
+            <h3 style="margin-top: 0; color: #efe3cc;">Event Options</h3>
+            <button class="btn btn-secondary" id="addOptionBtn" style="margin-bottom: 16px;">+ Add Option</button>
+            
+            <div id="optionsList">
+              <!-- Options injected here -->
+            </div>
+          </div>
+        </div>
+
+        <!-- In-game Event Preview Panel -->
+        <div class="event-preview-panel">
+          <div id="eventStylePickerWrap" style="margin-bottom:8px;">
+            <div style="font-size:11px; color:#8b949e; margin-bottom:5px;">Event window style <span style="color:#6e7681;">— click a style to set this event's window type</span></div>
+            <div id="eventStylePicker">
+              <button type="button" class="ev-style-btn" data-type="news_event">📰 World News</button>
+              <button type="button" class="ev-style-btn" data-type="country_event">📜 Report</button>
+              <button type="button" class="ev-style-btn" data-type="unit_leader_event">⚔️ Military Leader</button>
+              <button type="button" class="ev-style-btn" data-type="operative_leader_event">🕵️ Operative</button>
+            </div>
+            <div id="eventStyleHint" style="font-size:11px; color:#8b949e; margin-top:6px; line-height:1.45; min-height:16px;"></div>
+          </div>
+          <div class="event-preview-title">
+            📰 In-Game Event Dialog Preview
+          </div>
+          <div class="hoi4-event-box" id="previewEventBox">
+            <div class="hoi4-event-header" id="previewEventTitle">The Fall of the Government</div>
+            <div class="hoi4-event-img-frame">
+              <img id="previewEventImage" src="/api/vanilla-ui?rel=gfx/interface/event_news_bg.dds" alt="Event Picture" data-hide-on-error />
+            </div>
+            <div class="hoi4-event-desc" id="previewEventDesc">A long description of the event...</div>
+            <div class="hoi4-event-options" id="previewEventOptions">
+              <button class="hoi4-event-opt-btn" type="button">We must stand firm!</button>
+            </div>
+          </div>
+          <div id="newspaperStyleGroup" style="margin:10px 0; padding:10px; background:#0d1117; border:1px solid #30363d; border-radius:6px;">
+            <div style="font-size:12px; font-weight:600; color:#e6edf3; margin-bottom:6px;">📰 Newspaper Style <span style="font-weight:400; color:#8b949e;">(mod-wide · News Events)</span></div>
+            <div style="display:flex; align-items:center; gap:10px;">
+              <div id="newspaperStyleThumb" style="width:44px; height:50px; border:1px solid #30363d; border-radius:4px; background:#161b22 center/cover no-repeat; flex:none;"></div>
+              <div style="flex:1; min-width:0;">
+                <div id="newspaperStyleCurrent" style="font-size:12px; color:#c9d1d9; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Default newspaper</div>
+                <button class="btn btn-secondary" id="newspaperStyleBtn" type="button" style="margin-top:6px; width:100%; font-size:12px;">Change Newspaper Style…</button>
+              </div>
+            </div>
+          </div>
+          <p style="font-size: 11px; color: #8b949e; line-height: 1.4; margin: 0; font-family: sans-serif;">
+            💡 <em>This box simulates how the event popup will look to a player in-game. Changes in the form and options will reflect in real-time.</em>
+          </p>
+        </div>
+
+      </div>
+    </div>
+
+    <div id="eventImagePickerModal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>Select Event Image</h2>
+          <span id="closeEventImagePicker" class="modal-close">&times;</span>
+        </div>
+        <input type="text" id="eventImagePickerSearch" class="modal-search" placeholder="Search event images by name..." />
+        <div id="eventImagePickerGrid" class="modal-grid-focus-icons">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+    </div>
+    
+    <script src="./genesis-engine.js?v=23"></script>
+    <script src="./genesis-scripted-loader.js?v=1"></script>
+    <script src="./nova-ai-parse.js"></script>
+    <script src="./country-picker.js"></script>
+    <script src="events.js?v=dotns45"></script>
+    <script src="./ai-field-assist.js"></script>
+    <script src="./save-shortcut.js?v=2"></script>
+  <script src="./version-banner.js"></script>
+  </body>
+</html>

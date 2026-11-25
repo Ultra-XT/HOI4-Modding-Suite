@@ -1,0 +1,734 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>National Spirit Maker — Nova Modding Suite</title>
+    <!-- Branded "Loading…" veil for slow server scans (mod switch / cold loads). See loading-overlay.js. -->
+    <script src="./nova-i18n.js?v=1"></script>
+    <script src="./nova-bug-report.js?v=2"></script>
+    <script src="./loading-overlay.js?v=oobnote6"></script>
+    <link rel="stylesheet" href="./styles.css?v=minimap25" />
+    <style>
+      .ideas-layout {
+        display: flex;
+        height: calc(100vh - 65px); /* Subtract top dock height */
+        overflow: hidden;
+      }
+      /* Embedded in the Military › Companies iframe: keep the layout IDENTICAL to the standalone National
+         Spirits page (sidebar + editor + preview-on-the-side). The iframe is made full-viewport-width in
+         army.html so it has the same room as the standalone — no wrapping, no reposition. */
+      .ideas-sidebar {
+        width: 300px;
+        background: #11161e;
+        border-right: 1px solid #2d3440;
+        display: flex;
+        flex-direction: column;
+      }
+      .ideas-sidebar-header {
+        padding: 12px;
+        background: #1c232d;
+        border-bottom: 1px solid #2d3440;
+      }
+      .ideas-list {
+        flex: 1;
+        overflow-y: auto;
+        padding: 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .idea-item {
+        padding: 8px;
+        background: #1a202a;
+        border: 1px solid #2d3440;
+        border-radius: 4px;
+        cursor: pointer;
+        color: #e6edf3;
+      }
+      .idea-item:hover {
+        background: #232c3a;
+        border-color: #58a6ff;
+      }
+      .ideas-main {
+        flex: 1;
+        padding: 20px;
+        overflow-y: auto;
+        background: #0d1117;
+        display: flex;
+        gap: 24px;
+        align-items: start;
+        justify-content: center;
+      }
+      .idea-editor-panel {
+        background: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 8px;
+        padding: 24px;
+        flex: 1;
+        max-width: 760px;
+        margin: 0;
+      }
+      
+      /* Live Preview Styling */
+      .ideas-preview-panel {
+        width: 380px;
+        position: sticky;
+        top: 20px;
+        align-self: flex-start; /* natural height, not stretched — otherwise sticky has no room to pin */
+        background: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 8px;
+        padding: 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        flex-shrink: 0;
+      }
+      .ideas-preview-title {
+        font-size: 13px;
+        color: #8b949e;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .hoi4-spirit-preview {
+        background: #0d0f13;
+        border: 2px solid #2f3440;
+        border-radius: 6px;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+      }
+      .hoi4-spirit-icon-circle {
+        width: 72px;
+        height: 72px;
+        border-radius: 50%;
+        background: radial-gradient(circle, #2d3848 0%, #151b23 100%);
+        border: 2px solid #e8a849;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+      }
+      .hoi4-spirit-icon-circle img {
+        width: 54px;
+        height: 54px;
+        object-fit: contain;
+      }
+      /* Designer/company preview: the company picture is a rectangular portrait, not a round idea icon,
+         and the accent is the blue company tone rather than the spirit gold. */
+      .hoi4-spirit-preview.is-company .hoi4-spirit-icon-circle {
+        width: 104px;
+        height: 78px;
+        border-radius: 6px;
+        border-color: #3d6fb4;
+        background: radial-gradient(circle, #24303f 0%, #11161d 100%);
+      }
+      .hoi4-spirit-preview.is-company .hoi4-spirit-icon-circle img {
+        width: 96px;
+        height: 70px;
+      }
+      .hoi4-spirit-preview.is-company .hoi4-spirit-name {
+        color: #79c0ff;
+        font-family: 'Segoe UI', Arial, sans-serif;
+      }
+      .hoi4-spirit-name {
+        font-size: 16px;
+        font-weight: bold;
+        color: #eab308;
+        font-family: Georgia, serif;
+        text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+        text-align: center;
+      }
+      .hoi4-tooltip-sim {
+        background: rgba(10, 12, 16, 0.95);
+        border: 1.5px solid #4a5265;
+        border-radius: 4px;
+        padding: 12px;
+        width: 100%;
+        box-sizing: border-box;
+        font-family: sans-serif;
+        font-size: 12px;
+        line-height: 1.4;
+        color: #c9d1d9;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.7);
+      }
+      .hoi4-tooltip-header {
+        font-size: 13px;
+        font-weight: bold;
+        color: #e6edf3;
+        margin-bottom: 4px;
+        border-bottom: 1.5px solid #2f3440;
+        padding-bottom: 4px;
+      }
+      .hoi4-tooltip-desc {
+        color: #8b949e;
+        font-style: italic;
+        margin-bottom: 8px;
+        white-space: pre-wrap;
+      }
+      .hoi4-tooltip-cat {
+        color: #58a6ff;
+        font-weight: 600;
+        margin-bottom: 6px;
+      }
+      .hoi4-tooltip-cost {
+        color: #d29922;
+        margin-bottom: 6px;
+        font-weight: 600;
+      }
+      .hoi4-tooltip-modifiers {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        border-top: 1px dashed #2f3440;
+        padding-top: 6px;
+      }
+      .hoi4-modifier-line {
+        display: flex;
+        justify-content: flex-start;
+        align-items: baseline;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+      .hoi4-modifier-line > span:first-child { color: #c9d1d9; }
+      .hoi4-mod-val-pos {
+        color: #2ea043;
+        font-weight: 600;
+      }
+      .hoi4-mod-val-neg {
+        color: #f85149;
+        font-weight: 600;
+      }
+      .hoi4-mod-val-neut {
+        color: #e6edf3;
+      }
+      .form-group {
+        margin-bottom: 16px;
+      }
+      .form-group label {
+        display: block;
+        margin-bottom: 6px;
+        color: #c9d1d9;
+        font-weight: 600;
+        font-size: 13px;
+      }
+      .form-group input[type="text"],
+      .form-group textarea,
+      .form-group select {
+        width: 100%;
+        padding: 8px;
+        background: #0d1117;
+        border: 1px solid #30363d;
+        border-radius: 6px;
+        color: #c9d1d9;
+      }
+      .form-group textarea {
+        min-height: 80px;
+        resize: vertical;
+        font-family: monospace;
+      }
+      .btn {
+        padding: 8px 16px;
+        background: #238636;
+        color: #fff;
+        border: 1px solid rgba(240, 246, 252, 0.1);
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: 600;
+      }
+      .btn:hover {
+        background: #2ea043;
+      }
+      .btn-secondary {
+        background: #21262d;
+      }
+      .btn-secondary:hover {
+        background: #30363d;
+      }
+      .es-chip {
+        background: #1f2937;
+        border: 1px solid #374151;
+        color: #9fe0ff;
+        font-size: 11px;
+        font-weight: 600;
+        padding: 2px 8px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-family: monospace;
+      }
+      .es-chip:hover { background: #30363d; color: #d6f3ff; }
+
+      .picture-upload-group {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      }
+      #ideaPicturePreview {
+        width: 60px;
+        height: 60px;
+        background: #0d1117;
+        border: 1px dashed #30363d;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #8b949e;
+        overflow: hidden;
+      }
+      #ideaPicturePreview img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+      }
+      
+      /* AI GENERATOR */
+      .ai-generator-panel {
+        background: linear-gradient(145deg, #1c1328, #110d1a);
+        border: 1px solid #482f6e;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 24px;
+      }
+      .ai-generator-panel h3 {
+        margin: 0 0 12px 0;
+        color: #d1b4ff;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      /* ── Embedded in the Military › Companies iframe ──────────────────────────────────────────────
+         The Military page already supplies the app background, the page title and the mod context. Suppress
+         THIS page's duplicate chrome so the editor reads as PART of the Military tab rather than a second page
+         stacked inside it (the "two overlapping backgrounds" the user reported). Everything is scoped to
+         .nova-embed, so the standalone National Spirits page is untouched. The `html body.nova-embed` prefix +
+         !important is needed to beat the two !important rules in styles.css. #companies-embed */
+      html body.nova-embed { background: transparent !important; background-image: none !important; }
+      html body.nova-embed .top-dock {
+        background: transparent !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        border-bottom: none !important;
+        box-shadow: none !important;
+      }
+      body.nova-embed .app-header { padding: 0 16px 6px; }
+      body.nova-embed .title-row { justify-content: flex-end; } /* keep Save/Duplicate right-aligned once the h1 is gone */
+      body.nova-embed .title-row h1 { display: none; }          /* the Military page already titles this tab */
+      body.nova-embed .ideas-main { background: transparent !important; }
+      /* version-banner.js is a PAGE-level warning; army.html doesn't load it, so inside the iframe it renders
+         as a stray strip mid-page. */
+      body.nova-embed #novaVersionBanner { display: none !important; }
+
+      /* ── Layout: IDENTICAL to the standalone page ──────────────────────────────────────────────────
+         This page is a fixed-VIEWPORT two-pane app: .ideas-layout is viewport-tall with overflow hidden, and
+         the folders sidebar (.ideas-list) and the editor EACH own their scroll — same shape as Events and
+         Characters. Inside the iframe 100vh IS the iframe's height, so that layout just works; the frame is
+         given a viewport height by army.html and scrolls its panes internally.
+
+         A previous "#companies-onepage" experiment tried to make the embed FLOW to its content height so the
+         outer Military page was the single scroller. It regressed the tab badly: flattening .ideas-list to
+         `overflow: visible; flex: 0 0 auto` took away the sidebar's bounded window so the folder list had no
+         panel and could not scroll, un-stuck the preview, and left the frame relying on a wheel-forwarding
+         hack (a content-sized iframe has nothing of its own to scroll) which felt clunky. Reverted — the ONLY
+         embed overrides that remain are cosmetic chrome (above), so Companies is the same editor, laid out the
+         same way, as National Spirits. Do not re-introduce flow overrides here. #companies-embed
+         Only the dock height differs: the embed hides the h1/banner, so reclaim that space. */
+      /* ── EMBED = ONE PAGE (user: "i want the whole thing as one page, the helmet disappears from the top,
+         the page scrolls down as an entire page") ──────────────────────────────────────────────────────────
+         The standalone page is a fixed-viewport two-pane app. Embedded in Military, that made the helmet a
+         dead top bar over a self-scrolling frame. So here the whole embed FLOWS to its content height and the
+         OUTER Military page is the single scroller — the frame is content-sized by army.js, so scrolling the
+         page carries the helmet away with everything else.
+         THE ONE THING that broke the first flow attempt (607c68d) and MUST stay bounded: the folders sidebar.
+         Left to flow, expanding one MD companies file (286 entries) grew it to 13,328px and the whole page
+         became an endless run. So EVERYTHING flows EXCEPT .ideas-list, which keeps a capped height + its own
+         scroll — a normal file-list window that scrolls away with the page like any other block. #companies-onepage */
+      /* ── EMBED = THE SAME TWO-PANE APP AS THE STANDALONE PAGE ─────────────────────────────────────
+         #companies-embed-sidebar-cut-off — THE FLOWED VERSION LEFT THE SIDEBAR HANGING IN MID-AIR.
+
+         This embed used to flatten the layout so the whole thing flowed to its content height and the outer
+         Military page was the single scroller. Measured on Millennium Dawn with the flowed version:
+
+             .ideas-layout   1400 x 1500
+             .ideas-main     1100 x 1500
+             .ideas-sidebar   300 x  423     <-- ends here, 1077px of nothing beneath it
+
+         The sidebar is only as tall as its own content, so in a 1500px column it simply stopped partway
+         down with empty space under it — "the sidebar does not have an end or a start, it's just cut off" —
+         and because the outer page was the scroller, scrolling to reach the editor took the folders list
+         off the top of the screen entirely.
+
+         So the embed now keeps this page's normal fixed-viewport shape: the layout fills the frame, and the
+         folders list and the editor each scroll inside their own panel — exactly what the standalone page
+         does, which is the behaviour that was asked for ("it works more smoothly there").
+
+         Height comes from flex, not from a magic number: the standalone rule subtracts a 65px dock, but the
+         embed hides the h1 and the banner so its dock is ~6px. Letting the layout flex into whatever is left
+         means neither has to know the other's height.
+
+         ⚠️ The thing that broke the FIRST flow attempt is handled for free here: expanding one MD companies
+         file (286 entries) grew the sidebar to 13,328px. Bounded panes cannot do that — .ideas-list keeps
+         the standalone `flex: 1; overflow-y: auto`, so it fills the sidebar and scrolls inside it. */
+      body.nova-embed { overflow: hidden; height: 100vh; display: flex; flex-direction: column; }
+      body.nova-embed .ideas-layout { flex: 1 1 auto; min-height: 0; height: auto; overflow: hidden; }
+      /* companies: the in-game preview stays pinned while the editor scrolls beside it. */
+      body.nova-embed.mio-mode .ideas-preview-panel { position: sticky; top: 12px; align-self: flex-start; }
+      body.nova-embed .ideas-list { scrollbar-width: thin; }
+      body.nova-embed .ideas-list::-webkit-scrollbar { width: 8px; }
+      body.nova-embed .ideas-list::-webkit-scrollbar-thumb { background: #30363d; border-radius: 5px; }
+    /* ── Company (MIO) editor — shown in "Designers & Companies" mode ── */
+    /* Hide the entire idea form so only the company editor shows; keep the mode switch + the mount. */
+    body.mio-mode .idea-editor-panel > *:not(#ideaModeSwitch):not(#mioEditorMount) { display: none !important; }
+    /* the idea page's Save/Duplicate/Delete toolbar carries an !important display, so hide it from CSS in company mode
+       (the MIO editor has its own Save; those buttons would act on the hidden idea form). #companies-mio */
+    body.mio-mode #saveIdeaBtn, body.mio-mode #duplicateIdeaBtn, body.mio-mode #deleteIdeaBtn { display: none !important; }
+    .mio-intro { background:#132218; border:1px solid #1f6f3a; color:#a6e3bf; border-radius:8px; padding:10px 12px; font-size:13px; margin-bottom:14px; line-height:1.5; }
+    .mio-form { display:flex; flex-direction:column; gap:12px; }
+    .mio-form label, .mio-form .mio-lbl { display:flex; flex-direction:column; gap:4px; font-size:12px; color:#8b949e; font-weight:600; }
+    /* the company editor's own dark control style (this is how the write-boxes have always looked). NOTE: Nova's global
+       styles.css input rule only targets input[type="text"], and these inputs have no explicit type, so WITHOUT this
+       rule they fall back to the ugly browser-default white — keep it. Do NOT pin a height (a fixed height under a
+       select's forced padding clips the text — that was the earlier bug). */
+    .mio-form input, .mio-form select, .mio-form textarea { box-sizing:border-box; width:100%; background:#0d1117; border:1px solid #30363d; color:#c9d1d9; border-radius:6px; padding:8px 10px; font-size:13px; font-family:inherit; }
+    .mio-form textarea { resize:vertical; line-height:1.4; }
+    .mio-form input:focus, .mio-form select:focus, .mio-form textarea:focus { outline:none; border-color:#1f6feb; }
+    .mio-row2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; align-items:stretch; }
+    /* symmetry: both cells stretch to the tallest, and each control bottom-aligns so inputs share a baseline
+       even when one caption wraps to a second line (the "two boxes at different heights" fix) */
+    .mio-row2 > .mio-lbl { justify-content:space-between; }
+    .mio-row2 > .mio-lbl > input, .mio-row2 > .mio-lbl > select, .mio-row2 > .mio-lbl > textarea { margin-top:auto; }
+    .mio-hint { color:#6e7681; font-weight:400; font-size:11px; }
+    .mio-block { border:1px solid #21262d; border-radius:8px; padding:10px; display:flex; flex-direction:column; gap:8px; }
+    .mio-sub-h { font-size:12px; color:#adbac7; font-weight:700; display:flex; align-items:center; gap:8px; }
+    /* Inherited through `include` — shown because the game loads it, not editable here. Deliberately dimmer
+       and dashed than an editable block, so nobody mistakes it for something this company owns.
+       #mio-include-shown-as-empty */
+    .mio-inh { border-style:dashed; border-color:#30363d; background:#0d1117; }
+    .mio-inh-row { font-size:12px; color:#8b949e; padding:2px 0 2px 8px; border-left:2px solid #21262d; }
+    .mio-inh-row b { color:#adbac7; font-weight:600; }
+    .mio-inh-tag { font-size:10px; color:#0d1117; background:#6e7681; border-radius:3px; padding:0 4px; vertical-align:1px; }
+    .mio-inh-b { color:#6e7681; }
+    .mio-addline { display:flex; gap:6px; }
+    .mio-addline input { flex:1; }
+    .mio-add, .mio-save { background:#21262d; border:1px solid #30363d; color:#c9d1d9; border-radius:6px; padding:6px 10px; cursor:pointer; font-size:12px; }
+    .mio-add:hover { background:#2d333b; }
+    .mio-save { background:#238636; border-color:#2ea043; color:#fff; padding:9px 16px; font-size:13px; font-weight:600; }
+    .mio-save:hover { background:#2ea043; }
+    .mio-save:disabled { opacity:.6; cursor:default; }
+    .mio-chips { display:flex; flex-wrap:wrap; gap:6px; }
+    .mio-chip { background:#1c2b3a; border:1px solid #2b4a63; color:#9fd0ff; border-radius:12px; padding:2px 6px 2px 10px; font-size:12px; display:inline-flex; align-items:center; gap:4px; }
+    .mio-chip-x, .mio-brow-x, .mio-trait-x { background:none; border:none; color:#8b949e; cursor:pointer; font-size:13px; padding:0 2px; }
+    .mio-chip-x:hover, .mio-brow-x:hover, .mio-trait-x:hover { color:#f85149; }
+    .mio-stat-row { display:flex; gap:6px; align-items:center; }
+    .mio-stat-row .mio-bk { flex:2; } .mio-stat-row .mio-bv { flex:1; }
+    .mio-trait { border:1px solid #21262d; border-radius:6px; padding:8px; display:flex; flex-direction:column; gap:6px; margin-bottom:6px; }
+    .mio-trait-head { display:flex; justify-content:space-between; align-items:center; font-size:12px; }
+    .mio-actions { display:flex; align-items:center; gap:12px; }
+    .mio-status { font-size:12px; }
+    /* the company sidebar list reuses the CANONICAL folder/row classes from styles.css
+       (.category-container / .category-title / .category-items / .decision-item) — same as Spirits & Events. */
+    .mio-cap { display:inline; } /* Description caption; the shared ✨ AI button mounts inline-right of it */
+    </style>
+    <link rel="icon" href="favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" href="favicon.png">
+</head>
+  <body>
+    <div id="topDock" class="top-dock">
+      <nav class="suite-nav">
+        <a href="home.html" class="suite-nav-link" data-i18n="nav.home">Home</a>
+        <a href="country-setup.html" class="suite-nav-link" data-i18n="nav.countrySetup">Country Setup</a>
+        <a href="characters.html" class="suite-nav-link" data-i18n="nav.characters">Characters</a>
+        <a href="ideas.html" class="suite-nav-link active" data-i18n="nav.nationalSpirits">National Spirits</a>
+        <a href="research.html" class="suite-nav-link" data-i18n="nav.researchTree">Research Tree</a>
+        <a href="index.html" class="suite-nav-link" data-i18n="nav.focusTree">Focus Tree</a>
+        <a href="events.html" class="suite-nav-link" data-i18n="nav.events">Events</a>
+        <a href="decisions.html" class="suite-nav-link" data-i18n="nav.decisions">Decisions</a>
+        <a href="map.html" class="suite-nav-link" data-i18n="nav.mapEditor">Map Editor</a>
+        <a href="army.html" class="suite-nav-link" data-i18n="nav.military">Military</a>
+        <a href="modhealth.html" class="suite-nav-link" data-i18n="nav.modHealth">Mod Health</a>
+
+        <!-- target="_blank" is load-bearing, not decoration. main.js blocks in-window navigation to any
+             non-app origin (will-navigate -> preventDefault + "network blocked" warning), but routes a
+             window-open to an https URL through shell.openExternal. So this opens the user's real browser;
+             a plain href would look like an error. -->
+        <a href="https://discord.gg/Z6P23hjEsM" target="_blank" rel="noopener noreferrer"
+           class="suite-nav-link suite-nav-discord" style="margin-left:auto;"
+           title="Join the Nova Discord — report bugs and ask questions"><svg class="suite-nav-discord-mark" viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true" focusable="false"><path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z"/></svg>Discord</a>
+      </nav>
+      <header class="app-header">
+        <div class="title-row">
+          <h1>HOI4 National Spirit Maker</h1>
+          <div class="header-actions">
+            <div class="mod-selector-container" style="display: flex; align-items: center; gap: 8px; margin-right: 16px; background: #21262d; padding: 6px 12px; border-radius: 6px; border: 1px solid #30363d;">
+              <span style="font-size: 12px; color: #8b949e; font-weight: 600; white-space: nowrap;">📁 Active Mod:</span>
+              <select id="headerModSelector" style="background: #0d1117; border: 1px solid #30363d; color: #c9d1d9; border-radius: 4px; padding: 4px 8px; font-size: 12px; outline: none; cursor: pointer; min-width: 150px; max-width: 300px;"></select>
+            </div>
+            <button class="btn" id="saveIdeaBtn">Save National Spirit</button>
+            <button class="btn btn-secondary" id="duplicateIdeaBtn" style="margin-left: 8px;" title="Make an editable copy of the loaded national spirit (new id, ready to save)">⧉ Duplicate</button>
+            <button class="btn btn-secondary is-hidden" id="deleteIdeaBtn" style="border-color: #f85149; color: #f85149; margin-left: 8px;">Delete Spirit</button>
+          </div>
+        </div>
+      </header>
+    </div>
+
+    <div id="vanillaBanner" style="display: none; background: linear-gradient(90deg, #2a1800, #1a1000); border-bottom: 2px solid #d29922; padding: 10px 20px; text-align: center; font-size: 13px; color: #d29922; font-weight: 600;">
+      ⚠️ You are viewing <strong>Vanilla Game Files</strong> (read-only). To save changes, select or <a href="index.html" style="color: #58a6ff; text-decoration: underline;">create a mod</a> first.
+    </div>
+
+    <div class="ideas-layout">
+      <div class="ideas-sidebar">
+        <div class="ideas-sidebar-header">
+          <button class="btn btn-secondary" id="newIdeaBtn" style="width: 100%;">+ Create New Spirit</button>
+        </div>
+        <div style="padding: 8px; border-bottom: 1px solid #2d3440; background: #141b24;">
+          <input type="text" id="ideasListSearch" placeholder="🔍 Search spirits..." style="width: 100%; padding: 6px 12px; background: #0d1117; border: 1px solid #30363d; border-radius: 4px; color: #c9d1d9; font-size: 12px; outline: none;" />
+          <!-- A mod is an OVERLAY: the game loads the base game's ideas underneath this mod's, so the list
+               below is never the whole database. Opt-in rather than default-on (unlike the research tree,
+               where hiding inherited content caused silent LAYOUT collisions) — here the base game occupies
+               ids, not positions, and 6,000 read-only rows in a sidebar is noise. #overlay-blindness -->
+          <button class="btn" id="ideasShowBaseBtn" type="button" style="width: 100%; margin-top: 6px; padding: 5px 10px; background: #21262d; border: 1px solid #30363d; border-radius: 4px; color: #8b949e; font-size: 11.5px; cursor: pointer; text-align: left;">🏛 Base game: hidden</button>
+        </div>
+        <div class="ideas-list" id="ideasList">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+      
+      <div class="ideas-main">
+        <div class="idea-editor-panel">
+
+          <!-- This page makes the two idea kinds that are NOT characters: country national spirits, and
+               idea-based designers/companies (designer = yes). Advisors, military chiefs, theorists, and
+               high command are CHARACTERS — make those in the Characters menu. -->
+          <div id="ideaModeSwitch" style="display:flex; margin-bottom:16px; border:1px solid #30363d; border-radius:8px; overflow:hidden; width:fit-content;">
+            <button type="button" class="idea-mode-btn" data-mode="spirits" style="padding:8px 18px; border:none; background:#1f6feb; color:#fff; cursor:pointer; font-size:13px; font-weight:600;">🏳️ National Spirits</button>
+            <button type="button" class="idea-mode-btn" data-mode="designers" style="padding:8px 18px; border:none; background:transparent; color:#8b949e; cursor:pointer; font-size:13px; font-weight:600;">🏭 Designers &amp; Companies</button>
+          </div>
+
+          <!-- COMPANY (MIO) editor mount. In "Designers & Companies" mode the whole idea form below is hidden (via
+               body.mio-mode CSS) and mio-editor.js renders the real company editor here, so a company Nova makes is a
+               Military Industrial Organization that actually appears in-game with Arms Against Tyranny. #companies-mio -->
+          <div id="mioEditorMount" style="display:none;">
+            <div class="mio-intro">🏭 <b>Company editor</b> — makes a <b>Military Industrial Organization</b> (the in-game company system with Arms Against Tyranny). It also writes a legacy designer-idea fallback so the company still works without the DLC.</div>
+            <div id="mioEditorForm"></div>
+          </div>
+
+          <div class="ai-generator-panel">
+            <h3>✨ <span id="aiPanelTitle">AI Spirit Logic Generator</span> <span id="aiLogicHelpBtn" style="display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; background: #482f6e; color: #d1b4ff; font-size: 11px; cursor: pointer; font-weight: bold;" title="How does this work / How to get API Key?">?</span></h3>
+            <p id="aiPanelHint" style="font-size: 13px; color: #a18bbb; margin: 0 0 12px 0;">Describe what this spirit should do (e.g., boosts factory output by 10%, drains political power by 0.5 per day, allows women in the workforce).</p>
+            <textarea id="aiIdeaPrompt" placeholder="e.g. Gives 10% research speed, 5% factory output, but lowers stability by 5%" style="width: 100%; padding: 8px; background: #0b0711; border: 1px solid #482f6e; color: #e2d1fa; border-radius: 4px; min-height: 60px; margin-bottom: 8px;"></textarea>
+            <button class="btn" id="generateAiIdeaBtn" style="background: #5d3b8e; border-color: #8c60ce;">Generate Modifiers</button>
+            <span id="aiStatus" style="font-size: 12px; color: #8fa4b8; margin-left: 12px;"></span>
+          </div>
+
+          <div class="form-group" style="display: flex; gap: 16px;">
+            <div style="flex: 1;">
+              <label>Target Ideas File</label>
+              <input type="text" id="ideaTargetFile" value="custom_ideas.txt" />
+            </div>
+            <!-- This maker is for COUNTRY national spirits only. Advisors, military chiefs, theorists,
+                 high command, and designers/manufacturers are CHARACTERS (advisor = { slot = … }) and are
+                 made in the Characters menu. The category is therefore fixed to "country" (field hidden);
+                 the hidden <select> keeps every existing .value read returning "country". -->
+            <div style="flex: 1; display: none;" id="ideaCategoryField">
+              <label>Category</label>
+              <select id="ideaCategory" style="background: #0d1117; border: 1px solid #30363d; color: #c9d1d9; border-radius: 6px; padding: 8px;">
+                <option value="country">Country National Spirit (country)</option>
+              </select>
+            </div>
+            <div style="flex: 1;">
+              <label id="ideaIdLabel">National Spirit ID</label>
+              <input type="text" id="ideaId" value="custom_spirit_1" />
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label>In-game Name</label>
+            <input type="text" id="ideaName" placeholder="Fascism Banned" />
+            <div id="ideaNameRendered" class="nova-loc-hint" style="display:none; margin-top:4px; font-size:11px; color:#8b949e;"></div>
+          </div>
+
+          <div class="form-group">
+            <label>In-game Description</label>
+            <textarea id="ideaDescription" placeholder="This nation has strictly forbidden any fascist sentiment..." style="min-height: 50px;"></textarea>
+          </div>
+
+          <div class="form-group">
+            <label id="ideaIconLabel">National Spirit Icon</label>
+            <div class="picture-upload-group">
+              <div id="ideaPicturePreview">Icon</div>
+              <div style="display: flex; flex-direction: column; gap: 8px;">
+                <input type="text" id="ideaPictureId" placeholder="e.g. GFX_idea_generic_fascism_banned" />
+                <input type="file" id="ideaPictureUpload" accept="image/png, image/jpeg" style="display: none;" />
+                <div style="display: flex; gap: 8px; width: 100%;">
+                  <button class="btn btn-secondary" id="ideaPictureUploadBtn" style="flex: 1;">Upload Custom Icon</button>
+                  <button class="btn btn-secondary" id="selectVanillaIconBtn" style="flex: 1; background: #1f2937; border-color: #374151;">Browse Icons</button>
+                </div>
+                <span id="uploadStatus" style="font-size: 11px; color: #8b949e;">Upload a PNG to auto-convert to DDS</span>
+              </div>
+            </div>
+          </div>
+          
+          <div class="form-group" id="ideaOwnerBridge"></div>
+
+          <!-- Removal cost — valid for national spirits AND hireable ideas. -1 = permanent. -->
+          <div class="form-group" id="grpRemovalCost">
+            <label>Removal Cost <span id="removalCostHelpBtn" style="display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; background: #482f6e; color: #d1b4ff; font-size: 11px; cursor: pointer; font-weight: bold; margin-left: 4px;">?</span></label>
+            <input type="number" id="ideaRemovalCost" placeholder="-1" style="width: 90%;" />
+          </div>
+
+          <!-- Hireable options (advisors & designers/manufacturers) — hidden for country spirits -->
+          <div id="advisorSettingsGroup" style="display: none; background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+            <h4 style="margin: 0 0 12px 0; color: #58a6ff; font-size: 14px; font-weight: 600;">Company Options (cost &amp; trait)</h4>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+              <div class="form-group" style="margin-bottom: 0;">
+                <!-- #advisor-cost-invented-150 — blank, not 150. The GAME supplies the default when `cost`
+                     is absent, and it is not one number: common/defines/00_defines.lua sets
+                     DEFAULT_PP_COST_FOR_POLITICAL_ADVISOR = 150 and DEFAULT_PP_COST_FOR_MILITARY_ADVISOR = 50.
+                     Vanilla declares `cost` on ZERO of its 886 advisor-slot ideas and leans on those. -->
+                <label>Cost (Political Power to assign)</label>
+                <input type="number" id="ideaCost" value="" placeholder="leave blank for the game default (150 political / 50 military)" title="Leave blank to use Hearts of Iron IV's own default — 150 political power for a political advisor, 50 for a military one. Vanilla leaves this out on every advisor it ships." style="width: 90%;" />
+              </div>
+              <div class="form-group" style="margin-bottom: 0; position: relative;">
+                <label>Company trait</label>
+                <div style="display: flex; gap: 6px; align-items: center;">
+                  <input type="text" id="ideaTraits" placeholder="e.g. tank_manufacturer" style="flex: 1; min-width: 0;" />
+                  <button type="button" id="pickTraitBtn" class="btn btn-secondary" style="padding: 6px 10px; font-size: 11px; white-space: nowrap; flex: none;">📋 Browse</button>
+                </div>
+                <div id="traitPickerDropdown" style="display: none; position: absolute; z-index: 50; left: 0; right: 0; top: 100%; margin-top: 4px; max-height: 260px; overflow-y: auto; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; box-shadow: 0 8px 24px rgba(0,0,0,0.6); padding: 6px;"></div>
+              </div>
+            </div>
+            <div class="form-group" id="grpLedger" style="margin-bottom: 0;">
+              <label>Ledger (unit ledger tab the advisor shows in: army / navy / air / civilian / hidden)</label>
+              <input type="text" id="ideaLedger" placeholder="civilian" style="width: 90%;" />
+            </div>
+          </div>
+
+          <!-- Designer-only: research bonus -->
+          <div class="form-group" id="grpResearchBonus" style="display: none;">
+            <label>Research Bonus <span style="color:#8b949e;font-weight:400;">(designers — category = percent)</span></label>
+            <textarea id="ideaResearchBonus" placeholder="armor = 0.10&#10;artillery = 0.05" style="min-height: 40px;"></textarea>
+          </div>
+
+          <div class="form-group">
+            <label id="lblAllowed">Allowed <span style="color:#8b949e;font-weight:400;">(who can ever have this — e.g. <code>original_tag = GER</code>; checked once at game start)</span></label>
+            <textarea id="ideaAllowed" placeholder="original_tag = GER" style="min-height: 40px;">always = yes</textarea>
+          </div>
+
+          <!-- Country-only: kept after a civil war split -->
+          <div class="form-group" id="grpAllowedCivilWar" style="display: none;">
+            <label>Allowed Civil War <span style="color:#8b949e;font-weight:400;">(kept by the side that matches, after a civil war)</span></label>
+            <textarea id="ideaAllowedCivilWar" placeholder="always = yes" style="min-height: 40px;"></textarea>
+          </div>
+
+          <!-- Hireable-only: when the advisor/designer can be hired -->
+          <div class="form-group" id="grpAvailable" style="display: none;">
+            <label>Available <span style="color:#8b949e;font-weight:400;">(when this can be hired — advisors/designers only)</span></label>
+            <textarea id="ideaAvailable" placeholder="has_completed_focus = some_focus" style="min-height: 40px;"></textarea>
+            <div class="genesis-preview" id="ideaAvailablePreview" style="display:none;"></div>
+          </div>
+
+          <!-- Plain country modifiers. Hidden in Designers mode — companies use research_bonus +
+               equipment_bonus + traits, never a plain modifier (matches vanilla + MD). -->
+          <div class="form-group" id="grpModifiers">
+            <label>Modifiers</label>
+            <textarea id="ideaModifiers" placeholder="industrial_capacity_factory = 0.1&#10;political_power_gain = 0.5"></textarea>
+          </div>
+
+          <details class="nova-advanced">
+            <summary>Advanced — equipment bonuses (nested script)</summary>
+            <div class="nova-advanced-body">
+              <p class="nova-advanced-hint">Cheaper/stronger weapons &amp; equipment. Uses nested HOI4 syntax — click ✨AI to write it from a plain description.</p>
+              <div class="form-group">
+                <label>Equipment Modifiers</label>
+                <textarea id="ideaEquipment" placeholder="infantry_weapons = { build_cost_ic = -0.10 }"></textarea>
+              </div>
+            </div>
+          </details>
+
+          <details class="nova-advanced">
+            <summary>Advanced — visibility &amp; on-add effects (optional)</summary>
+            <div class="nova-advanced-body">
+              <p class="nova-advanced-hint" id="advScriptHint">For special cases. Leave blank and the spirit works fine. These accept HOI4 conditions/effects — use the ✨AI box if you can't write the script.</p>
+              <div class="form-group">
+                <label>Visible <span id="hintVisible" style="color:#8b949e;font-weight:400;">(when the spirit's icon is shown — hides it until the condition is met)</span></label>
+                <textarea id="ideaVisible" placeholder="has_completed_focus = some_focus" style="min-height: 40px;"></textarea>
+              </div>
+              <div class="form-group">
+                <label>On Add <span id="hintOnAdd" style="color:#8b949e;font-weight:400;">(effects that fire once, the moment the spirit is granted)</span></label>
+                <textarea id="ideaOnAdd" placeholder="add_political_power = 50" style="min-height: 40px;"></textarea>
+                <div class="genesis-preview" id="ideaOnAddPreview" style="display:none;"></div>
+              </div>
+              <div class="form-group">
+                <label>Extra script <span style="color:#8b949e;font-weight:400;">(raw HOI4 blocks added verbatim inside this spirit, for anything the form doesn't model. Starts empty each time — blocks already in the file are kept automatically, so you only type what you want to ADD.) Click to insert:</span></label>
+                <div id="ideaExtraScriptChips" style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:6px;">
+                  <button type="button" class="es-chip" id="chipOnRemove" data-snip="on_remove" title="Effects that run when this spirit is removed">+ on_remove</button>
+                  <button type="button" class="es-chip" id="chipCancel" data-snip="cancel" title="Trigger that auto-removes this spirit when met">+ cancel</button>
+                  <button type="button" class="es-chip" data-snip="targeted_modifier" title="Modifiers aimed at another country">+ targeted_modifier</button>
+                  <button type="button" class="es-chip" data-snip="rule" title="Allow/deny diplomatic or military actions">+ rule</button>
+                  <button type="button" class="es-chip" data-snip="ai_will_do" title="How eagerly the AI takes/keeps this (for pickable ideas)">+ ai_will_do</button>
+                </div>
+                <textarea id="ideaExtraScript" placeholder="targeted_modifier = { tag = ENG attack_bonus_against = 0.1 }" style="min-height: 40px;"></textarea>
+              </div>
+            </div>
+          </details>
+
+        </div>
+
+        <!-- Live Preview Panel -->
+        <div class="ideas-preview-panel">
+          <div class="ideas-preview-title">📂 In-Game National Spirit Preview</div>
+          <div class="hoi4-spirit-preview">
+            <div class="hoi4-spirit-icon-circle">
+              <img id="previewIdeaIcon" src="/api/vanilla-ui?rel=gfx/interface/ideas/idea_unknown.dds" alt="" />
+            </div>
+            <div id="previewIdeaName" class="hoi4-spirit-name">New Spirit</div>
+            
+            <div class="hoi4-tooltip-sim">
+              <div class="hoi4-tooltip-header" id="tooltipIdeaName">New Spirit</div>
+              <div class="hoi4-tooltip-desc" id="tooltipIdeaDesc">No description.</div>
+              <div class="hoi4-tooltip-cat" id="tooltipIdeaCat">National Spirit</div>
+              <div class="hoi4-tooltip-cost" id="tooltipIdeaCost" style="display: none;">PP to remove: 100</div>
+              <div class="hoi4-tooltip-modifiers" id="tooltipIdeaModifiers">
+                <div style="color: #6e7681;">No effects or modifiers</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+    
+    <!-- Icon Picker Modal -->
+    <div id="iconPickerModal" class="modal" style="display: none; position: fixed; z-index: 10000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.85); backdrop-filter: blur(4px);">
+      <div class="modal-content" style="background-color: #0d1117; margin: 5% auto; padding: 24px; border: 1px solid #30363d; border-radius: 12px; width: 80%; max-width: 900px; box-shadow: 0 8px 32px rgba(0,0,0,0.5);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #21262d; padding-bottom: 12px;">
+          <h2 id="iconPickerTitle" style="margin: 0; font-size: 18px; color: #c9d1d9;">Select National Spirit Icon</h2>
+          <span id="closeIconPicker" style="color: #8b949e; float: right; font-size: 28px; font-weight: bold; cursor: pointer; transition: color 0.2s;">&times;</span>
+        </div>
+        <input type="text" id="iconPickerSearch" placeholder="🔍 Search icons by name (e.g. industry, defense, navy, air, army)..." style="width: 100%; padding: 12px; font-size: 14px; background: #161b22; border: 1px solid #30363d; color: #c9d1d9; border-radius: 6px; margin-bottom: 20px; outline: none;" />
+        <div id="iconPickerGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 16px; max-height: 500px; overflow-y: auto; padding: 4px;">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+    </div>
+
+    <script src="./genesis-engine.js?v=23"></script>
+    <script src="./genesis-scripted-loader.js?v=1"></script>
+    <script src="./nova-ai-parse.js"></script>
+    <script src="./country-picker.js"></script>
+    <script src="./owner-bridge.js"></script>
+    <script src="./mio-editor.js?v=12"></script>
+    <script src="ideas.js?v=dupeloc58"></script>
+    <script src="./ai-field-assist.js"></script>
+    <script src="./save-shortcut.js?v=2"></script>
+  <script src="./version-banner.js"></script>
+  </body>
+</html>

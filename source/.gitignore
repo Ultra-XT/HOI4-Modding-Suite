@@ -1,0 +1,82 @@
+node_modules/
+dist/
+backups/
+_backups/
+backup*/
+*.log
+.DS_Store
+Thumbs.db
+all_my_code.txt
+server_log.txt
+.env
+
+# Session backup artifacts (throwaway)
+Nova_backups/
+Nova_backup*.zip
+.claude/scheduled_tasks.lock
+reference/
+
+# Throwaway debugging/bug-hunt scratch scripts (never part of the program)
+scratch-*.js
+scratch/
+port-experiment-groups.json
+
+# runtime telemetry log (regenerated each run)
+logs/telemetry.jsonl
+
+# Test-suite run logs (node run-tests.js > _suiteN.txt) — regenerated on every run.
+_suite*.txt
+
+# Internal working notes — kept on disk, never published.
+#
+# These are the bug-hunt ledgers, session handoffs and planning documents the
+# project is developed against. They are not addressed to users: several are
+# written to whoever picks the work up next, and several are lists of defects
+# that were still open when they were written. Publishing them alongside a
+# release invites both confusion and misreading, so they stay local.
+#
+# Untracked 2026-08-25 before the 1.0.6 release. They remain in git history —
+# this only stops them appearing in the repo tree from here on.
+AI_SUMMARY.md
+AUTOSESSION_NOTES.md
+HANDOFF.md
+SESSION_HANDOFF.md
+DESIGN_TOOLS_PROPOSAL.md
+MAP_EDITOR_PLAN.md
+REORG_PLAN.md
+UPDATER_PROPOSAL.md
+HOI4_FEATURE_AUDIT.md
+ROADMAP.md
+RELEASE-NOTES-v*.md
+
+# Bug-hunt findings + progress ledgers (all _-prefixed working files).
+_*.md
+
+# Bug-hunt verdict dumps and tmp catalogues — the JSON siblings of the _*.md
+# ledgers above. Same reason: adversarial-verification output and scratch data,
+# regenerated on demand, never addressed to a user.
+_verdicts.json
+_build-defects.json
+_build-verdicts.json
+*.tmp_catalog.json
+
+# Debug/tooling artifacts — referenced by no code, kept locally, never published.
+repomix-output.xml
+snaps/
+md-research-gui-*.gui
+
+# Built executables — releases are attached to a GitHub release, never committed.
+# A 98 MB unsigned exe from 1.0.2 (under the old project name) sat in the repo
+# root for months and was ~99% of what a clone downloaded.
+*.exe
+!Texconv.exe
+
+# The third-party notices are written here by scripts/gen-third-party-notices.js before every build (the prebuild
+# hooks), from what actually ships, and build.extraFiles copies them next to the exe. Never typed and never committed:
+# a hand-kept copy is exactly what goes stale between releases.
+/THIRD-PARTY-NOTICES.txt
+
+# Back-out controls: a test patches server.js and requires the copy, so `.ctl-<test>-<pid>.js` is a whole
+# ~2 MB server with a deliberate bug in it. Each test removes its own in a finally block, but a crash or a
+# Ctrl-C leaves one behind — and a later `git add -A` would commit a broken server beside the real one.
+.ctl-*.js

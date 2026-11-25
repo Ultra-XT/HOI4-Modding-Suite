@@ -1,0 +1,6 @@
+Elevate {elevate.fileVersion} by Johannes Passing  ({elevate.where};
+added by electron-builder's NSIS tooling). https://github.com/jpassing/elevate
+Licence: MIT. The upstream LICENSE.md leaves its copyright line as the
+template's "<year> <copyright holders>"; the program's version resource
+reads "{elevate.legalCopyright}".
+{licence:elevate-LICENSE.txt}

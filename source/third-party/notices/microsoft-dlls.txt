@@ -1,0 +1,4 @@
+d3dcompiler_47.dll ("Direct3D HLSL Compiler for Redistribution") and
+dxil.dll ("DirectX IL for Redistribution") are Microsoft files that
+Electron {electron} ships with its runtime. They are redistributed here
+exactly as Electron distributes them. (c) Microsoft Corporation.

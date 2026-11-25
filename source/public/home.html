@@ -1,0 +1,1089 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Nova Modding Suite - Home</title>
+  <!-- Branded "Loading…" veil for slow server scans (mod switch / cold loads). See loading-overlay.js. -->
+  <script src="./nova-i18n.js?v=1"></script>
+  <script src="./nova-bug-report.js?v=2"></script>
+  <script src="./loading-overlay.js?v=oobnote6"></script>
+  <link rel="stylesheet" href="./styles.css?v=suite104" />
+  <style>
+    /* Reset scroll behavior specifically for the Home Page to allow scrolling */
+    html, body {
+      overflow-y: auto !important;
+      height: auto !important;
+      min-height: 100vh;
+      background-color: #0d1117;
+      color: #c9d1d9;
+    }
+    
+    .home-container {
+      max-width: 1550px;
+      margin: 0 auto;
+      padding: 40px 24px 80px;
+      font-family: 'Inter', sans-serif;
+    }
+    
+    .home-header {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+    
+    .home-title {
+      font-size: 38px;
+      font-weight: 700;
+      color: #fff;
+      margin: 0 0 10px 0;
+      background: linear-gradient(135deg, #a855f7 0%, #3b82f6 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: -0.5px;
+    }
+    
+    .home-subtitle {
+      font-size: 16px;
+      color: #8b949e;
+      margin: 0;
+    }
+    
+    /* Active Mod Context Card */
+    .mod-context-card {
+      background: rgba(22, 27, 34, 0.7);
+      border: 1px solid rgba(148, 163, 184, 0.15);
+      border-radius: 14px;
+      padding: 20px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    }
+    
+    .mod-context-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #8b949e;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 12px;
+    }
+    
+    .mod-selector-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    
+    .mod-select {
+      background: #0d1117;
+      border: 1px solid #30363d;
+      color: #c9d1d9;
+      padding: 10px 16px;
+      font-size: 14px;
+      border-radius: 8px;
+      outline: none;
+      cursor: pointer;
+      flex: 1 1 200px;
+      min-width: 0;
+      font-weight: 600;
+      transition: border-color 0.2s;
+    }
+    
+    .mod-select:focus {
+      border-color: #a855f7;
+    }
+    
+    .mod-status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      background: rgba(168, 85, 247, 0.15);
+      color: #c084fc;
+      border: 1px solid rgba(168, 85, 247, 0.3);
+      white-space: nowrap;
+    }
+    
+    .mod-status-badge.vanilla {
+      background: rgba(234, 179, 8, 0.15);
+      color: #facc15;
+      border: 1px solid rgba(234, 179, 8, 0.3);
+    }
+    
+    .mod-path-text {
+      font-size: 12px;
+      color: #8b949e;
+      font-family: monospace;
+      margin-top: 8px;
+      word-break: break-all;
+    }
+
+    /* Per-mod progress strip inside the Active Mod card */
+    .mod-progress {
+      margin-top: 16px;
+      padding-top: 14px;
+      border-top: 1px solid rgba(148, 163, 184, 0.12);
+    }
+    .mod-progress-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .mp-stat {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+      background: rgba(13, 17, 23, 0.6);
+      border: 1px solid rgba(148, 163, 184, 0.12);
+      border-radius: 8px;
+      padding: 7px 12px;
+      font-size: 12px;
+      color: #8b949e;
+      text-decoration: none;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s, transform 0.15s;
+    }
+    .mp-stat:hover {
+      border-color: #a855f7;
+      background: rgba(30, 41, 59, 0.55);
+      transform: translateY(-1px);
+    }
+    .mp-stat .mp-num {
+      font-size: 15px;
+      font-weight: 700;
+      color: #c9d1d9;
+    }
+    .mp-stat.is-zero { opacity: 0.6; }
+    .mp-stat.is-zero .mp-num { color: #6e7681; }
+    .mp-stat.is-zero:hover { opacity: 1; }
+    .mod-progress-health {
+      margin-top: 10px;
+      font-size: 12.5px;
+      font-weight: 600;
+    }
+    .mp-health-ok { color: #3fb950; }
+    .mp-health-warn { color: #d29922; }
+    .mp-health-err { color: #f85149; }
+    .mp-health-muted { color: #6e7681; font-weight: 500; }
+    /* ⛔ #nova-does-not-find-the-game — the Game folder line in the Active Mod card */
+    .game-folder-box { margin-top: 10px; }
+    .game-folder-row { display: flex; align-items: flex-start; gap: 8px; }
+    .game-folder-text { flex: 1 1 auto; margin-top: 0; }
+    .game-folder-from { font-size: 11.5px; color: #6e7681; margin-top: 3px; }
+    .game-folder-btn {
+      background: rgba(48, 54, 61, 0.6); border: 1px solid #30363d; color: #c9d1d9;
+      font-size: 11.5px; font-weight: 600; padding: 3px 10px; border-radius: 6px; cursor: pointer; white-space: nowrap;
+    }
+    .game-folder-btn:hover { border-color: #a855f7; color: #fff; }
+    .game-folder-btn.primary { background: rgba(168, 85, 247, 0.2); border-color: rgba(168, 85, 247, 0.5); color: #e9d5ff; }
+    .game-folder-btn:disabled { opacity: 0.55; cursor: default; }
+    .game-folder-missing {
+      margin-top: 10px; padding: 10px 12px; border-radius: 8px; font-size: 12.5px; line-height: 1.5;
+      color: #f0c674; background: rgba(210, 153, 34, 0.1); border: 1px solid rgba(210, 153, 34, 0.45);
+    }
+    .game-folder-missing .game-folder-btn { margin-left: 4px; }
+    .game-folder-looked { margin-top: 8px; color: #8b949e; }
+    .game-folder-looked ul { margin: 6px 0 0 0; padding-left: 18px; }
+    .game-folder-looked code { font-size: 11px; word-break: break-all; }
+    .game-folder-edit { margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(148, 163, 184, 0.12); }
+    .game-folder-label { display: block; font-size: 12px; font-weight: 600; color: #c9d1d9; margin-bottom: 6px; }
+    .game-folder-input {
+      width: 100%; box-sizing: border-box; background: #0d1117; border: 1px solid #30363d; color: #c9d1d9;
+      padding: 8px 10px; font-size: 12.5px; font-family: monospace; border-radius: 6px; outline: none;
+    }
+    .game-folder-input:focus { border-color: #a855f7; }
+    .game-folder-hint { font-size: 11.5px; color: #8b949e; margin-top: 6px; line-height: 1.45; }
+    .game-folder-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+    .game-folder-status { font-size: 12px; margin-top: 8px; line-height: 1.45; word-break: break-word; }
+    .game-folder-status:empty { display: none; }
+    
+    /* Layout grid for dashboard */
+    .dashboard-layout {
+      display: grid;
+      grid-template-columns: 380px 1fr;
+      gap: 30px;
+      margin-top: 24px;
+      align-items: start;
+    }
+    
+    @media (max-width: 1024px) {
+      .dashboard-layout {
+        grid-template-columns: 1fr;
+      }
+    }
+    
+    .dashboard-sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    
+    .dashboard-main {
+      display: flex;
+      flex-direction: column;
+      gap: 30px;
+    }
+    
+    .quick-actions-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    
+    @media (max-width: 768px) {
+      .quick-actions-row {
+        grid-template-columns: 1fr;
+      }
+    }
+    
+    /* Storyline/Wizard Hero Card */
+    .wizard-card {
+      background: linear-gradient(135deg, rgba(76, 29, 149, 0.4) 0%, rgba(30, 58, 138, 0.4) 100%);
+      border: 1px solid rgba(139, 92, 246, 0.3);
+      border-radius: 16px;
+      padding: 30px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      transition: transform 0.2s, border-color 0.2s;
+    }
+    
+    .wizard-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(139, 92, 246, 0.5);
+    }
+    
+    .wizard-title {
+      font-size: 24px;
+      font-weight: 700;
+      color: #fff;
+      margin: 0 0 12px 0;
+    }
+    
+    .wizard-desc {
+      font-size: 14px;
+      color: #d1d5db;
+      line-height: 1.6;
+      margin-bottom: 24px;
+    }
+    
+    .wizard-btn {
+      background: #8b5cf6;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #fff;
+      padding: 12px 24px;
+      font-size: 14px;
+      font-weight: 600;
+      border-radius: 8px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: background-color 0.2s, box-shadow 0.2s;
+    }
+    
+    .wizard-btn:hover {
+      background: #7c3aed;
+      box-shadow: 0 0 20px rgba(139, 92, 246, 0.4);
+    }
+
+    .wizard-btn:disabled {
+      background: #1f2937;
+      border-color: #374151;
+      color: #4b5563;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    /* Load Country Hero Card */
+    .load-country-card {
+      background: linear-gradient(135deg, rgba(30, 58, 138, 0.4) 0%, rgba(15, 118, 110, 0.4) 100%);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      border-radius: 16px;
+      padding: 30px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      transition: transform 0.2s, border-color 0.2s;
+    }
+    
+    .load-country-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(56, 189, 248, 0.5);
+    }
+    
+    .load-btn {
+      background: #0284c7;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #fff;
+      padding: 12px 24px;
+      font-size: 14px;
+      font-weight: 600;
+      border-radius: 8px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: background-color 0.2s, box-shadow 0.2s;
+      width: 100%;
+    }
+    
+    .load-btn:hover {
+      background: #0369a1;
+      box-shadow: 0 0 20px rgba(56, 189, 248, 0.4);
+    }
+
+    .load-btn:disabled {
+      background: #1f2937;
+      border-color: #374151;
+      color: #4b5563;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+    
+    /* ── "＋ New Mod" button beside the workspace dropdown ── */
+    .mod-new-btn {
+      background: rgba(168, 85, 247, 0.16);
+      border: 1px solid rgba(168, 85, 247, 0.4);
+      color: #d8b4fe;
+      padding: 9px 14px;
+      font-size: 13px;
+      font-weight: 700;
+      border-radius: 8px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
+    }
+    .mod-new-btn:hover { background: rgba(168, 85, 247, 0.28); border-color: #a855f7; color: #fff; }
+
+    /* ── Primary "Create a New Mod" hero (the obvious front door) ── */
+    .new-mod-hero {
+      position: relative;
+      background: linear-gradient(135deg, rgba(126, 34, 206, 0.55) 0%, rgba(37, 99, 235, 0.45) 100%);
+      border: 1px solid rgba(168, 85, 247, 0.45);
+      border-radius: 16px;
+      padding: 26px 30px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      flex-wrap: wrap;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.32);
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .new-mod-hero.is-firstrun {
+      border-color: rgba(250, 204, 21, 0.7);
+      box-shadow: 0 0 0 1px rgba(250, 204, 21, 0.35), 0 8px 36px rgba(0, 0, 0, 0.4);
+    }
+    .new-mod-hero-text { flex: 1 1 320px; min-width: 0; }
+    .new-mod-hero-title {
+      font-size: 26px; font-weight: 800; color: #fff; margin: 0 0 8px 0; letter-spacing: -0.3px;
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    }
+    .new-mod-hero-desc { font-size: 14px; color: #e5e7eb; line-height: 1.6; margin: 0; max-width: 640px; }
+    .new-mod-hero-desc b { color: #fff; font-weight: 700; }
+    .first-run-pill {
+      display: none;
+      font-size: 11px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase;
+      background: rgba(250, 204, 21, 0.18); color: #fde047;
+      border: 1px solid rgba(250, 204, 21, 0.5); border-radius: 999px; padding: 3px 10px;
+    }
+    .new-mod-hero.is-firstrun .first-run-pill { display: inline-flex; }
+    .new-mod-btn-primary {
+      flex-shrink: 0;
+      background: #fff;
+      border: none;
+      color: #4c1d95;
+      padding: 15px 28px;
+      font-size: 15px;
+      font-weight: 800;
+      border-radius: 10px;
+      cursor: pointer;
+      display: inline-flex; align-items: center; gap: 8px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+      transition: transform 0.15s, box-shadow 0.15s, background 0.15s;
+    }
+    .new-mod-btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(168, 85, 247, 0.5); background: #f5f3ff; }
+    @media (max-width: 640px) { .new-mod-btn-primary { width: 100%; justify-content: center; } }
+
+    /* Success banner shown after a mod is created */
+    .new-mod-success {
+      background: rgba(34, 197, 94, 0.12);
+      border: 1px solid rgba(34, 197, 94, 0.4);
+      border-radius: 12px;
+      padding: 14px 18px;
+      display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+      color: #86efac; font-size: 14px; font-weight: 600;
+    }
+    .new-mod-success b { color: #fff; }
+    .new-mod-success .nm-success-hint { color: #9ca3af; font-weight: 500; }
+
+    /* ── New Mod modal form fields (reuses .settings-modal-overlay / .settings-modal) ── */
+    .nm-field { margin-top: 16px; }
+    .nm-field:first-child { margin-top: 4px; }
+    .nm-label { display: block; font-size: 12px; font-weight: 600; color: #c9d1d9; margin-bottom: 6px; }
+    .nm-label .req { color: #f85149; }
+    .nm-input, .nm-select {
+      width: 100%; box-sizing: border-box;
+      background: #0d1117; border: 1px solid #30363d; color: #c9d1d9;
+      border-radius: 8px; padding: 11px 12px; font-size: 14px; outline: none;
+      transition: border-color 0.15s;
+    }
+    .nm-input:focus, .nm-select:focus { border-color: #a855f7; }
+    .nm-slug-hint { font-size: 11.5px; color: #6e7681; margin-top: 6px; min-height: 15px; }
+    .nm-slug-hint code { color: #8b949e; background: rgba(110,118,129,0.15); padding: 1px 5px; border-radius: 4px; }
+    .nm-addon-fields { margin-top: 12px; display: none; }
+    .nm-addon-fields.show { display: block; }
+    .nm-help { font-size: 11.5px; color: #6e7681; margin-top: 6px; line-height: 1.5; }
+    .nm-error {
+      display: none; margin-top: 14px; font-size: 12.5px; line-height: 1.5;
+      background: rgba(248, 81, 73, 0.1); border: 1px solid rgba(248, 81, 73, 0.4);
+      color: #ff7b72; border-radius: 8px; padding: 9px 12px;
+    }
+    .nm-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px; }
+    .nm-btn-cancel {
+      background: #21262d; border: 1px solid #30363d; color: #c9d1d9;
+      padding: 11px 18px; font-size: 13px; font-weight: 600; border-radius: 8px; cursor: pointer;
+      transition: background 0.15s;
+    }
+    .nm-btn-cancel:hover { background: #30363d; }
+    .nm-btn-create {
+      background: #8b5cf6; border: 1px solid rgba(255,255,255,0.12); color: #fff;
+      padding: 11px 22px; font-size: 13px; font-weight: 700; border-radius: 8px; cursor: pointer;
+      transition: background 0.15s;
+    }
+    .nm-btn-create:hover { background: #7c3aed; }
+    .nm-btn-create:disabled { opacity: 0.55; cursor: default; }
+    .nm-modal-title { font-size: 18px; font-weight: 700; color: #f0f6fc; margin: 0 0 4px; }
+    .nm-modal-sub { font-size: 12.5px; color: #8b949e; margin: 0 0 6px; line-height: 1.5; }
+
+    /* New Mod success view (shown in-place after create, so the confirmation is where the eye already is) */
+    .nm-success-view { text-align: center; padding: 10px 6px 4px; }
+    .nm-success-check { font-size: 42px; line-height: 1; margin-bottom: 10px; }
+    .nm-success-headline { font-size: 18px; font-weight: 800; color: #f0f6fc; margin: 0 0 8px; overflow-wrap: anywhere; }
+    .nm-success-body { font-size: 13.5px; color: #adbac7; line-height: 1.55; margin: 0 0 20px; }
+    .nm-success-body b { color: #fff; }
+    .nm-next-actions { display: flex; flex-direction: column; gap: 10px; }
+    .nm-next-primary {
+      background: #2ea043; border: 1px solid rgba(255,255,255,0.12); color: #fff;
+      padding: 13px 20px; font-size: 14px; font-weight: 700; border-radius: 9px; cursor: pointer;
+      transition: background 0.15s;
+    }
+    .nm-next-primary:hover { background: #3fb950; }
+    .nm-next-secondary {
+      background: transparent; border: none; color: #8b949e; padding: 6px; font-size: 13px; cursor: pointer;
+      text-decoration: underline; transition: color 0.15s;
+    }
+    .nm-next-secondary:hover { color: #c9d1d9; }
+
+    /* "Load an Existing Country" hero — same shape as .new-mod-hero, in blue/teal instead of purple */
+    .load-existing-hero {
+      position: relative;
+      background: linear-gradient(135deg, rgba(30, 58, 138, 0.55) 0%, rgba(13, 148, 136, 0.42) 100%);
+      border: 1px solid rgba(56, 189, 248, 0.42);
+      border-radius: 16px;
+      padding: 26px 30px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      flex-wrap: wrap;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.32);
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .load-existing-hero:hover { border-color: rgba(56, 189, 248, 0.7); }
+    .load-existing-title {
+      font-size: 26px; font-weight: 800; color: #fff; margin: 0 0 8px 0; letter-spacing: -0.3px;
+    }
+    .load-existing-btn {
+      flex-shrink: 0;
+      background: #fff;
+      border: none;
+      color: #0c4a6e;
+      padding: 15px 28px;
+      font-size: 15px;
+      font-weight: 800;
+      border-radius: 10px;
+      cursor: pointer;
+      display: inline-flex; align-items: center; gap: 8px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+      transition: transform 0.15s, box-shadow 0.15s, background 0.15s;
+    }
+    .load-existing-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(56, 189, 248, 0.5); background: #f0f9ff; }
+    @media (max-width: 640px) { .load-existing-btn { width: 100%; justify-content: center; } }
+
+    /* Journey Sequence Column */
+    .journey-col {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    
+    .journey-section-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #8b949e;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      margin: 10px 0 5px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .journey-section-title::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: rgba(148, 163, 184, 0.1);
+    }
+    
+    .journey-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 16px;
+    }
+    
+    @media (min-width: 600px) {
+      .journey-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+    
+    .journey-card {
+      background: rgba(22, 27, 34, 0.6);
+      border: 1px solid rgba(148, 163, 184, 0.1);
+      border-radius: 12px;
+      padding: 20px;
+      text-decoration: none;
+      color: inherit;
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      cursor: pointer;
+    }
+    
+    .journey-card:hover {
+      background: rgba(30, 41, 59, 0.5);
+      border-color: #a855f7;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 20px rgba(168, 85, 247, 0.1);
+    }
+    
+    .journey-icon {
+      font-size: 24px;
+      background: rgba(168, 85, 247, 0.1);
+      border: 1px solid rgba(168, 85, 247, 0.2);
+      border-radius: 8px;
+      width: 44px;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    
+    .journey-card:hover .journey-icon {
+      background: rgba(168, 85, 247, 0.2);
+      border-color: rgba(168, 85, 247, 0.4);
+    }
+    
+    .journey-info {
+      flex: 1;
+    }
+    
+    .journey-name {
+      font-size: 15px;
+      font-weight: 600;
+      color: #fff;
+      margin: 0 0 4px 0;
+    }
+    
+    .journey-desc {
+      font-size: 12px;
+      color: #8b949e;
+      line-height: 1.5;
+      margin: 0;
+    }
+
+    /* ── Home extras: settings, tips, about ───────────── */
+    .home-card {
+      background: rgba(22, 27, 34, 0.7);
+      border: 1px solid rgba(148, 163, 184, 0.15);
+      border-radius: 14px;
+      padding: 22px 24px;
+      backdrop-filter: blur(10px);
+    }
+    
+    .home-card h3 {
+      font-size: 15px; font-weight: 700; color: #f0f6fc; margin: 0 0 4px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    
+    .home-card .card-sub { font-size: 12.5px; color: #8b949e; margin: 0 0 16px; line-height: 1.5; }
+
+    /* Settings: API key row */
+    .settings-key-label { font-size: 11px; color: #8b949e; letter-spacing: 0.04em; text-transform: uppercase; }
+    .settings-key-row { display: flex; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
+    #homeGeminiKey {
+      flex: 1 1 200px; min-width: 0;
+      background: #0d1117; border: 1px solid #30363d; color: #c9d1d9;
+      border-radius: 8px; padding: 10px 12px; font-size: 13px; outline: none;
+      text-overflow: ellipsis;
+    }
+    #homeGeminiKey:focus { border-color: #a855f7; }
+    .settings-verify-btn {
+      background: #1f6feb; border: 1px solid #388bfd; color: #fff; font-weight: 600;
+      border-radius: 8px; padding: 10px 16px; font-size: 13px; cursor: pointer; white-space: nowrap;
+      transition: background 0.15s;
+    }
+    .settings-verify-btn:hover { background: #388bfd; }
+    .settings-verify-btn:disabled { opacity: 0.6; cursor: default; }
+    #homeGeminiStatus {
+      display: none; margin-top: 10px; font-size: 12px; line-height: 1.5;
+      max-height: 96px; overflow-y: auto;
+      overflow-wrap: anywhere; word-break: break-word; white-space: pre-wrap;
+      background: rgba(13,17,23,0.6); border: 1px solid #21262d; border-radius: 8px; padding: 8px 10px;
+    }
+
+    /* Advanced toggle (vanilla edits) */
+    .settings-toggle-row { display: flex; align-items: center; gap: 12px; }
+    .nova-switch { position: relative; display: inline-block; width: 42px; height: 23px; flex-shrink: 0; }
+    .nova-switch input { opacity: 0; width: 0; height: 0; }
+    .nova-switch .track {
+      position: absolute; inset: 0; cursor: pointer; border-radius: 999px;
+      background: #30363d; transition: background 0.18s;
+    }
+    .nova-switch .track::before {
+      content: ""; position: absolute; height: 17px; width: 17px; left: 3px; top: 3px;
+      background: #c9d1d9; border-radius: 50%; transition: transform 0.18s;
+    }
+    .nova-switch input:checked + .track { background: #d29922; }
+    .nova-switch input:checked + .track::before { transform: translateX(19px); }
+    #vanillaEditStatus { display:none; margin-top:10px; font-size:12px; line-height:1.5; border-radius:8px; padding:8px 10px; }
+    .settings-key-hint { font-size: 11px; color: #6e7681; margin-top: 8px; }
+    .settings-key-hint a { color: #58a6ff; }
+
+    /* Settings popup */
+    .settings-modal-overlay {
+      position: fixed; inset: 0; z-index: 1000;
+      display: flex; align-items: flex-start; justify-content: center;
+      padding: 60px 16px; overflow: auto;
+      background: rgba(1, 4, 9, 0.72); backdrop-filter: blur(4px);
+    }
+    .settings-modal {
+      position: relative; width: 100%; max-width: 520px;
+      background: #0f141b; border: 1px solid #2b3441; border-radius: 14px;
+      padding: 22px 22px 20px; box-shadow: 0 18px 60px rgba(0,0,0,0.6);
+      animation: settingsPop 0.18s ease-out;
+    }
+    @keyframes settingsPop { from { opacity: 0; transform: translateY(-8px) scale(0.98); } to { opacity: 1; transform: none; } }
+    .settings-modal-section { margin-top: 16px; padding-top: 14px; border-top: 1px solid #21262d; }
+    .settings-modal-section:first-of-type { margin-top: 10px; padding-top: 0; border-top: none; }
+    .settings-modal-close {
+      position: absolute; top: 12px; right: 12px; width: 30px; height: 30px;
+      border: none; border-radius: 8px; background: #21262d; color: #c9d1d9;
+      font-size: 20px; line-height: 1; cursor: pointer; transition: background 0.15s;
+    }
+    .settings-modal-close:hover { background: #30363d; color: #fff; }
+
+    /* Tips list */
+    .home-tips { list-style: none; margin: 0; padding: 0; }
+    .home-tips li {
+      display: flex; gap: 10px; align-items: flex-start;
+      font-size: 13px; color: #adbac7; line-height: 1.55; padding: 7px 0;
+      border-bottom: 1px solid rgba(148,163,184,0.07);
+    }
+    .home-tips li:last-child { border-bottom: none; }
+    .home-tips .tip-ic { flex-shrink: 0; }
+
+    .home-about { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; font-size: 12.5px; color: #8b949e; }
+    .home-about b { color: #c9d1d9; font-weight: 600; }
+    .home-about .dot { width: 4px; height: 4px; border-radius: 50%; background: #30363d; }
+    .home-footer { margin-top: 30px; padding-top: 16px; border-top: 1px solid rgba(148,163,184,0.1); text-align: center; font-size: 12px; color: #6e7681; }
+  </style>
+  <link rel="icon" href="favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" href="favicon.png">
+</head>
+<body>
+  
+  <nav class="suite-nav">
+    <a href="home.html" class="suite-nav-link active" data-i18n="nav.home">Home</a>
+    <a href="country-setup.html" class="suite-nav-link" data-i18n="nav.countrySetup">Country Setup</a>
+    <a href="characters.html" class="suite-nav-link" data-i18n="nav.characters">Characters</a>
+    <a href="ideas.html" class="suite-nav-link" data-i18n="nav.nationalSpirits">National Spirits</a>
+    <a href="research.html" class="suite-nav-link" data-i18n="nav.researchTree">Research Tree</a>
+    <a href="index.html" class="suite-nav-link" data-i18n="nav.focusTree">Focus Tree</a>
+    <a href="events.html" class="suite-nav-link" data-i18n="nav.events">Events</a>
+    <a href="decisions.html" class="suite-nav-link" data-i18n="nav.decisions">Decisions</a>
+    <a href="map.html" class="suite-nav-link" data-i18n="nav.mapEditor">Map Editor</a>
+        <a href="army.html" class="suite-nav-link" data-i18n="nav.military">Military</a>
+    <a href="modhealth.html" class="suite-nav-link" data-i18n="nav.modHealth">Mod Health</a>
+    <!-- target="_blank" is load-bearing, not decoration. main.js blocks in-window navigation to any
+         non-app origin (will-navigate -> preventDefault + "network blocked" warning), but routes a
+         window-open to an https URL through shell.openExternal. So this opens the user's real browser;
+         a plain href would look like an error. -->
+    <a href="https://discord.gg/Z6P23hjEsM" target="_blank" rel="noopener noreferrer"
+       class="suite-nav-link suite-nav-discord" style="margin-left:auto;"
+       title="Join the Nova Discord — report bugs and ask questions"><svg class="suite-nav-discord-mark" viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true" focusable="false"><path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z"/></svg>Discord</a>
+    <a href="#" id="openSettingsBtn" class="suite-nav-link" data-i18n="nav.settings">⚙ Settings</a>
+  </nav>
+
+  <div class="home-container">
+    <div class="home-header">
+      <h1 class="home-title">🪐 Nova Modding Suite</h1>
+      <p class="home-subtitle" data-i18n="home.subtitle">Hearts of Iron IV Visual Country Creation &amp; Scripting Hub</p>
+    </div>
+
+    <div class="dashboard-layout">
+      <!-- Left Configuration & Assistance Sidebar -->
+      <div class="dashboard-sidebar">
+        <!-- Active Mod Context Card -->
+        <div class="mod-context-card">
+          <div class="mod-context-title" data-i18n="home.activeMod">📂 Active Mod Workspace</div>
+          <div class="mod-selector-row">
+            <select id="homeModSelector" class="mod-select">
+              <option>Loading mods...</option>
+            </select>
+            <button id="homeNewModBtn" class="mod-new-btn" type="button" title="Create a brand-new mod workspace">＋ New Mod</button>
+            <div id="modStatusBadge" class="mod-status-badge">Modded</div>
+          </div>
+          <div id="modPathText" class="mod-path-text">Active path: --</div>
+          <!-- ⛔ #nova-does-not-find-the-game — the game folder Nova reads the base game from, where it found it, and the
+               modder's own choice when it found none or the wrong copy (home.js initGameFolder). -->
+          <div id="gameFolderBox" class="game-folder-box">
+            <div class="game-folder-row">
+              <div id="gameFolderText" class="mod-path-text game-folder-text">Game folder: looking…</div>
+              <button id="gameFolderChangeBtn" class="game-folder-btn" type="button" title="Tell Nova where Hearts of Iron IV is installed">Change</button>
+            </div>
+            <div id="gameFolderFrom" class="game-folder-from" hidden></div>
+            <div id="gameFolderMissing" class="game-folder-missing" role="alert" hidden></div>
+            <div id="gameFolderEdit" class="game-folder-edit" hidden>
+              <label class="game-folder-label" for="gameFolderInput">Hearts of Iron IV's folder — the one with hoi4.exe in it</label>
+              <input id="gameFolderInput" class="game-folder-input" type="text" spellcheck="false" autocomplete="off" placeholder="D:\SteamLibrary\steamapps\common\Hearts of Iron IV" />
+              <div class="game-folder-hint">In Steam: right-click Hearts of Iron IV, Manage, Browse local files, then copy the folder's address from the top of that window and paste it here.</div>
+              <div class="game-folder-actions">
+                <button id="gameFolderSaveBtn" class="game-folder-btn primary" type="button">Use this folder</button>
+                <button id="gameFolderClearBtn" class="game-folder-btn" type="button" title="Forget the folder you chose and let Nova find the game by itself" hidden>Let Nova find it</button>
+                <button id="gameFolderCancelBtn" class="game-folder-btn" type="button">Cancel</button>
+              </div>
+            </div>
+            <!-- OUTSIDE the box: a save closes the box, and what it says ("✓ Nova now reads…", or "It could not remember this for next
+                 time") must stay on screen after it (review P-P2: inside it, both went with the box). -->
+            <div id="gameFolderStatus" class="game-folder-status" role="status"></div>
+          </div>
+          <!-- Per-mod progress -->
+          <div id="modProgress" class="mod-progress" hidden>
+            <div class="mod-progress-row" id="modProgressRow"></div>
+            <div class="mod-progress-health" id="modProgressHealth"></div>
+          </div>
+        </div>
+
+        <!-- Settings (AI key + Advanced) now live in the ⚙ Settings popup (see #settingsModal). -->
+
+        <!-- Quick Tips Card -->
+        <div class="home-card">
+          <h3>💡 Quick Tips &amp; Onboarding</h3>
+          <p class="card-sub">Get started with the suite:</p>
+          <ul class="home-tips">
+            <li><span class="tip-ic">🆕</span><span>Click <b>Create a New Mod</b> to make your own workspace, then add a country, focus tree, research, and more inside it — everything saves into that mod.</span></li>
+            <li><span class="tip-ic">✨</span><span>Click any <b>AI</b> button in the maker tabs to write script from English descriptions.</span></li>
+            <li><span class="tip-ic">💾</span><span>Use each tab's <b>Save</b> button to write your changes — everything goes into the active mod above, <b>never</b> the base game.</span></li>
+            <li><span class="tip-ic">🩺</span><span>Run <b>Mod Health</b> periodically to scan and debug broken mod references.</span></li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Right Main Modding Workspace -->
+      <div class="dashboard-main">
+        <!-- PRIMARY front door: create a mod (the workspace everything else lives in) -->
+        <div id="newModHero" class="new-mod-hero">
+          <div class="new-mod-hero-text">
+            <h2 class="new-mod-hero-title" data-i18n-html="hero.newMod.title">🆕 Create a New Mod <span class="first-run-pill">👋 New here? Start here</span></h2>
+            <p class="new-mod-hero-desc" data-i18n-html="hero.newMod.desc">
+              A <b>mod</b> is your own workspace — every country, focus tree, research, event, and map you make lives inside it, kept safely separate from the base game. Name one and start building.
+            </p>
+          </div>
+          <button id="createNewModBtn" class="new-mod-btn-primary" type="button">
+            <span data-i18n="hero.newMod.button">＋ Create a New Mod</span>
+          </button>
+        </div>
+
+        <!-- Success banner (hidden until a mod is created) -->
+        <div id="newModSuccess" class="new-mod-success" style="display:none;"></div>
+
+        <!-- Load an existing country — same hero design as "Create a New Mod", in blue -->
+        <div class="load-existing-hero">
+          <div class="new-mod-hero-text">
+            <h2 class="load-existing-title" data-i18n="hero.load.title">📂 Load an Existing Country</h2>
+            <p class="new-mod-hero-desc" data-i18n-html="hero.load.desc">
+              Already started one? Browse your files and open a <b>national_focus</b> .txt to jump straight back into editing its focus tree.
+            </p>
+          </div>
+          <button id="editCountryBtn" class="load-existing-btn" type="button">
+            <span data-i18n="hero.load.button">📂 Browse &amp; Load File</span>
+          </button>
+        </div>
+
+        <!-- Reorganized Journey Section -->
+        <div class="journey-col">
+          <div class="journey-section-title">Modding workflow stages</div>
+          <div class="journey-grid">
+            <!-- Foundation -->
+            <a href="country-setup.html" class="journey-card">
+              <div class="journey-icon">🏳️</div>
+              <div class="journey-info">
+                <h3 class="journey-name" data-i18n="journey.countrySetup">1. Country Setup</h3>
+                <p class="journey-desc" data-i18n="journeyDesc.countrySetup">Manage tag settings, capital states, political parties, stability, and starter popularities.</p>
+              </div>
+            </a>
+
+            <!-- People -->
+            <a href="characters.html" class="journey-card">
+              <div class="journey-icon">👤</div>
+              <div class="journey-info">
+                <h3 class="journey-name" data-i18n="journey.characters">2. Characters</h3>
+                <p class="journey-desc" data-i18n="journeyDesc.characters">Create country leaders, military chiefs, political advisors, and generals/admirals with custom portraits.</p>
+              </div>
+            </a>
+
+            <!-- Spirits -->
+            <a href="ideas.html" class="journey-card">
+              <div class="journey-icon">🛡️</div>
+              <div class="journey-info">
+                <h3 class="journey-name" data-i18n="journey.nationalSpirits">3. National Spirits</h3>
+                <p class="journey-desc" data-i18n="journeyDesc.nationalSpirits">Design custom starting national spirits, modifiers, research speed bonuses, and manufacturers.</p>
+              </div>
+            </a>
+
+            <!-- Research -->
+            <a href="research.html" class="journey-card">
+              <div class="journey-icon">🔬</div>
+              <div class="journey-info">
+                <h3 class="journey-name" data-i18n="journey.researchTree">4. Research Tree</h3>
+                <p class="journey-desc" data-i18n="journeyDesc.researchTree">Grant starting technologies and customize tech folders or layout grids for your custom research tree.</p>
+              </div>
+            </a>
+
+            <!-- Focus Tree -->
+            <a href="index.html" class="journey-card">
+              <div class="journey-icon">🎯</div>
+              <div class="journey-info">
+                <h3 class="journey-name" data-i18n="journey.focusTree">5. Focus Tree</h3>
+                <p class="journey-desc" data-i18n="journeyDesc.focusTree">Design visual node networks, custom focus branches, and interactive prerequisite lines.</p>
+              </div>
+            </a>
+
+            <!-- Event Maker -->
+            <a href="events.html" class="journey-card">
+              <div class="journey-icon">📜</div>
+              <div class="journey-info">
+                <h3 class="journey-name" data-i18n="journey.events">6. Events</h3>
+                <p class="journey-desc" data-i18n="journeyDesc.events">Script country-wide report events or world news alerts with option choices and immediate effects.</p>
+              </div>
+            </a>
+
+            <!-- Decision Maker -->
+            <a href="decisions.html" class="journey-card">
+              <div class="journey-icon">⚖️</div>
+              <div class="journey-info">
+                <h3 class="journey-name" data-i18n="journey.decisions">7. Decisions</h3>
+                <p class="journey-desc" data-i18n="journeyDesc.decisions">Configure political decision categories, mission timers, political power costs, and dynamic effect scripts.</p>
+              </div>
+            </a>
+
+            <!-- Map Editor -->
+            <a href="map.html" class="journey-card">
+              <div class="journey-icon">🗺️</div>
+              <div class="journey-info">
+                <h3 class="journey-name" data-i18n="journey.mapEditor">8. Map Editor</h3>
+                <p class="journey-desc" data-i18n="journeyDesc.mapEditor">Edit states and provinces on a live map — owners, cores, victory points, resources, buildings, and strategic regions.</p>
+              </div>
+            </a>
+
+            <!-- Military -->
+            <a href="army.html" class="journey-card">
+              <div class="journey-icon">⚔️</div>
+              <div class="journey-info">
+                <h3 class="journey-name" data-i18n="journey.military">9. Military</h3>
+                <p class="journey-desc" data-i18n="journeyDesc.military">Design division templates and equipment, create manufacturers and companies, and give a country its starting army, fleet and air force.</p>
+              </div>
+            </a>
+
+            <!-- Mod Health -->
+            <a href="modhealth.html" class="journey-card">
+              <div class="journey-icon">🩺</div>
+              <div class="journey-info">
+                <h3 class="journey-name" data-i18n="journey.modHealth">10. Mod Health</h3>
+                <p class="journey-desc" data-i18n="journeyDesc.modHealth">Review error lists, track down missing localizations, and scan for orphaned spirit/idea definitions.</p>
+              </div>
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="home-footer">
+      <div class="home-about">
+        <span><b>Nova Modding Suite</b></span>
+        <span class="dot"></span>
+        <span>Visual mod creation for <b>Hearts of Iron IV</b></span>
+        <span class="dot"></span>
+        <span>Runs 100% on your PC — your mods never leave your machine</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- New Mod popup (opened by "＋ New Mod" / "Create a New Mod") -->
+  <div id="newModModal" class="settings-modal-overlay" style="display:none;" role="dialog" aria-modal="true" aria-label="Create a new mod">
+    <div class="settings-modal">
+      <button class="settings-modal-close" id="newModClose" type="button" title="Close (Esc)" aria-label="Close">&times;</button>
+
+      <!-- Form view -->
+      <div id="newModFormView">
+        <h2 class="nm-modal-title">🆕 Create a New Mod</h2>
+        <p class="nm-modal-sub">This makes a fresh, empty mod workspace and switches you to it. Everything you build afterward is saved inside it.</p>
+
+        <div class="nm-field">
+          <label class="nm-label" for="newModName">Mod name <span class="req">*</span></label>
+          <input id="newModName" class="nm-input" type="text" maxlength="80" placeholder="e.g. My Great War Mod" autocomplete="off" spellcheck="false" />
+          <div id="newModSlugHint" class="nm-slug-hint"></div>
+        </div>
+
+        <div class="nm-field">
+          <label class="settings-toggle-row" style="cursor:pointer;">
+            <span class="nova-switch">
+              <input id="newModAddonToggle" type="checkbox" />
+              <span class="track"></span>
+            </span>
+            <span style="font-size:13px; color:#c9d1d9; font-weight:600;">Make this an add-on to an existing mod</span>
+          </label>
+          <div id="newModAddonFields" class="nm-addon-fields">
+            <label class="nm-label" for="newModAddonSelect" style="margin-top:10px;">Loads on top of</label>
+            <select id="newModAddonSelect" class="nm-select">
+              <option value="">— choose a mod —</option>
+            </select>
+            <p class="nm-help">Add-ons load after another mod (like Millennium Dawn) so you can extend or override it instead of replacing it. Leave this off to make a standalone mod.</p>
+          </div>
+        </div>
+
+        <div id="newModError" class="nm-error"></div>
+
+        <div class="nm-actions">
+          <button id="newModCancel" class="nm-btn-cancel" type="button">Cancel</button>
+          <button id="newModCreate" class="nm-btn-create" type="button">＋ Create Mod</button>
+        </div>
+      </div>
+
+      <!-- Success view (shown in-place after create, so the confirmation is right where the user is looking) -->
+      <div id="newModSuccessView" style="display:none;">
+        <div class="nm-success-view">
+          <div class="nm-success-check">✅</div>
+          <h2 class="nm-success-headline" id="newModSuccessName">Your mod is ready</h2>
+          <p class="nm-success-body">It's now your <b>active workspace</b> — everything you build from here saves into it. What would you like to start with?</p>
+          <div class="nm-next-actions">
+            <button id="newModGoCountry" class="nm-next-primary" type="button">🏳️ Set up your country →</button>
+            <button id="newModGoWorld" class="nm-next-secondary" type="button" title="Replace the base game's map in this mod with a new generated world — Nova shows what it will do and asks first.">🌍 Generate a world for it →</button>
+            <button id="newModDone" class="nm-next-secondary" type="button">I'll explore the build stages myself</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings popup (opened by the ⚙ Settings nav link) -->
+  <div id="settingsModal" class="settings-modal-overlay" style="display:none;" role="dialog" aria-modal="true" aria-label="Settings">
+    <div class="settings-modal">
+      <button class="settings-modal-close" id="settingsModalClose" type="button" title="Close (Esc)" aria-label="Close">&times;</button>
+      <h2 style="margin:0 0 4px 0; font-size:18px; color:#e6edf3;" data-i18n="settings.title">⚙️ Settings</h2>
+
+      <!-- 🐞 Report a bug. Everything here happens on this machine: Nova builds the text, the user reads it,
+           and then pastes it where they were already going. Nothing is sent anywhere by Nova itself, which is
+           why there is no server behind this and no privacy surface to defend. #bug-report -->
+      <section class="settings-modal-section">
+        <h3 style="margin:0 0 4px 0; font-size:14px;" data-i18n="bug.title">🐞 Report a bug</h3>
+        <p class="card-sub" style="margin:0 0 8px 0;" data-i18n="bug.hint">Say what happened and Nova adds the details that make it reproducible — its version, the mod you have open and what it depends on, which screen you were on, and any errors this page hit. Read it, then send it wherever suits you.</p>
+        <textarea id="bugWhat" class="army-input" rows="3" style="width:100%; resize:vertical;" data-i18n-placeholder="bug.placeholder" placeholder="What happened, and what you expected instead"></textarea>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:8px;">
+          <button id="bugPreviewBtn" class="settings-verify-btn" type="button" data-i18n="bug.preview">Build report</button>
+          <button id="bugCopyBtn" class="settings-verify-btn" type="button" data-i18n="bug.copy" hidden>Copy</button>
+          <a id="bugIssueLink" class="suite-nav-link" href="#" target="_blank" rel="noopener noreferrer" data-i18n="bug.github" hidden>Open a GitHub issue</a>
+          <span id="bugStatus" style="font-size:12px;"></span>
+        </div>
+        <textarea id="bugReport" class="army-input" rows="10" style="width:100%; margin-top:8px; font-family:monospace; font-size:11.5px; resize:vertical;" spellcheck="false" hidden></textarea>
+      </section>
+
+      <!-- Interface language. Nova's chrome only — HOI4's own vocabulary stays English on purpose, because
+           that is what the game files, the wiki and every guide use. Untranslated strings fall back to the
+           English already on the page, so a partial dictionary is never a broken screen. -->
+      <section class="settings-modal-section">
+        <h3 style="margin:0 0 4px 0; font-size:14px;" data-i18n="settings.language">Interface language</h3>
+        <p class="card-sub" style="margin:0 0 8px 0;" data-i18n="settings.languageHint">Changes Nova's own interface only. HOI4 script, ids and file paths stay in English — that is how they are written in the game's files and on the wiki.</p>
+        <select id="novaLangSelect" class="army-input" style="max-width:220px;"></select>
+        <div id="novaLangNote" class="settings-key-hint" style="margin-top:6px;" data-i18n="settings.languagePartial">The translation is partial: anything not yet translated stays in English.</div>
+      </section>
+
+      <section class="settings-modal-section">
+        <h3 style="margin:0 0 4px 0; font-size:14px;">AI assistant setup</h3>
+        <p class="card-sub" style="margin:0 0 8px 0;">Nova's ✨AI features use Google Gemini to write complex HOI4 script. Paste your free API key here once to enable it across all tabs.</p>
+        <div class="settings-key-label">Gemini API Key</div>
+        <div class="settings-key-row">
+          <input id="homeGeminiKey" type="text" placeholder="AIza…  (paste key here)" autocomplete="off" spellcheck="false" />
+          <button id="homeVerifyKeyBtn" class="settings-verify-btn">Verify &amp; Save</button>
+        </div>
+        <div id="homeGeminiStatus"></div>
+        <div class="settings-key-hint">
+          No key yet? <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Get a free one from Google AI Studio</a> (starts with “AIza”).
+        </div>
+      </section>
+
+      <section class="settings-modal-section">
+        <h3 style="margin:0 0 4px 0; font-size:14px;">Advanced</h3>
+        <p class="card-sub" style="margin:0 0 8px 0;">For experienced modders only. Normally Nova only writes into your mods; turn this on to let it edit the real Hearts of Iron IV game files directly.</p>
+        <div class="settings-toggle-row">
+          <label class="nova-switch">
+            <input type="checkbox" id="allowVanillaEditsToggle" />
+            <span class="track"></span>
+          </label>
+          <div>
+            <div style="font-weight:600; font-size:13.5px; color:#e6edf3;">Allow editing vanilla game files</div>
+            <div style="font-size:11.5px; color:#8b949e;">Off by default. Resets each time you launch Nova.</div>
+          </div>
+        </div>
+        <div id="vanillaEditStatus"></div>
+      </section>
+
+      <section class="settings-modal-section">
+        <h3 style="margin:0 0 4px 0; font-size:14px;">Maintenance</h3>
+        <p class="card-sub" style="margin:0 0 8px 0;">Nova caches icons, sprites and localisation in its own folder so it loads fast. These caches <b>never touch your game or mods</b> — they only affect what this app displays. If you verified game files or changed a mod and Nova still shows the old icon/name, clear the cache to force a fresh read. (Your API key is never affected.)</p>
+        <button id="clearCacheBtn" class="settings-verify-btn" type="button" style="background:#6e40c9;">🧹 Clear display cache</button>
+        <div id="clearCacheStatus" style="font-size:11.5px; color:#8b949e; margin-top:8px;"></div>
+      </section>
+
+      <section class="settings-modal-section">
+        <h3 style="margin:0 0 4px 0; font-size:14px;">🔬 HOI4 Diagnostics</h3>
+        <p class="card-sub" style="margin:0 0 8px 0;">Launch Hearts of Iron IV, let it fully load or crash, then click below. Nova gathers <b>every</b> game log <b>and the latest crash dump</b> (incl. the crash's exception + stack trace, which the normal logs don't show) into one report — so you can paste it here for a real diagnosis instead of guessing.</p>
+        <button id="collectDiagBtn" class="settings-verify-btn" type="button" style="background:#1f6feb;">🔬 Collect HOI4 logs + crash report</button>
+        <button id="copyDiagBtn" class="settings-verify-btn" type="button" style="background:#30363d; display:none;">📋 Copy</button>
+        <div id="collectDiagStatus" style="font-size:11.5px; color:#8b949e; margin-top:8px;"></div>
+        <textarea id="diagOutput" readonly style="display:none; width:100%; box-sizing:border-box; height:220px; margin-top:8px; background:#0d1117; border:1px solid #30363d; border-radius:6px; color:#c9d1d9; font-family:monospace; font-size:11px; white-space:pre; overflow:auto;"></textarea>
+      </section>
+    </div>
+  </div>
+
+  <script src="./home.js?v=13"></script>
+<script src="./version-banner.js"></script>
+<script src="./update-check.js"></script>
+<script src="./startup-backup-warning.js"></script>
+</body>
+</html>

@@ -1,0 +1,1912 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Research Tree — Nova Modding Suite</title>
+    <link rel="stylesheet" href="./styles.css?v=minimap26" />
+    <!-- Loads early so it wraps fetch before the page's own scripts run; shows a loading
+         overlay only if the first-visit cache build actually takes a moment. -->
+    <script src="./nova-i18n.js?v=1"></script>
+    <script src="./nova-bug-report.js?v=2"></script>
+    <script src="./loading-overlay.js?v=oobnote6"></script>
+    <script src="./nova-combo.js?v=5"></script>
+    <style>
+      /* === Premium Redesigned Palette === */
+      :root {
+        --bg-base: #0d1117;
+        --bg-deep: #090c10;
+        --border-premium: rgba(148, 163, 184, 0.12);
+        --border-glow: rgba(168, 85, 247, 0.3);
+        --text-primary: #f0f6fc;
+        --text-secondary: #8b949e;
+        --accent-purple: #a855f7;
+        --accent-purple-glow: rgba(168, 85, 247, 0.4);
+        --accent-blue: #3b82f6;
+        --accent-blue-glow: rgba(59, 130, 246, 0.4);
+        --researched-green: #2ea043;
+        --researched-green-glow: rgba(46, 160, 67, 0.45);
+        --locked-gray: #4b5563;
+        
+        --tech-card-bg: rgba(22, 27, 34, 0.7);
+        --tech-card-bg-hover: rgba(30, 41, 59, 0.55);
+        --tech-card-bg-completed: rgba(46, 160, 67, 0.12);
+        --tech-card-bg-locked: rgba(22, 27, 34, 0.4);
+        --tech-card-bg-available: rgba(59, 130, 246, 0.08);
+      }
+
+      .research-layout {
+        display: flex;
+        height: calc(100vh - 65px);
+        overflow: hidden;
+        background: var(--bg-deep);
+        font-family: 'Inter', sans-serif;
+      }
+
+      .research-sidebar {
+        width: 340px;
+        background: rgba(13, 17, 23, 0.45) !important;
+        backdrop-filter: blur(16px) !important;
+        -webkit-backdrop-filter: blur(16px) !important;
+        border-right: 1px solid rgba(148, 163, 184, 0.12) !important;
+        display: flex;
+        flex-direction: column;
+        overflow-y: auto;
+        box-shadow: 4px 0 24px rgba(0, 0, 0, 0.15) !important;
+      }
+
+      .research-sidebar-header {
+        padding: 16px !important;
+        background: rgba(22, 27, 34, 0.4) !important;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.12) !important;
+        display: flex;
+        gap: 8px;
+      }
+
+      .research-main {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        background: var(--bg-deep);
+        position: relative;
+        overflow: hidden;
+      }
+
+      .folder-tabs-shell {
+        display: flex;
+        align-items: stretch;
+        background: rgba(22, 27, 34, 0.3);
+        border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+        box-shadow: inset 0 -1px 4px rgba(0,0,0,0.2);
+        min-width: 0;
+      }
+
+      .folder-tabs {
+        display: flex;
+        flex: 1 1 auto;
+        min-width: 0;
+        padding: 8px 8px 0 8px;
+        gap: 6px;
+        overflow-x: auto;
+        overflow-y: hidden;
+        scroll-behavior: smooth;
+        scrollbar-width: thin;
+        scrollbar-color: var(--accent-purple) rgba(13, 17, 23, 0.5);
+      }
+
+      .folder-tabs::-webkit-scrollbar {
+        height: 6px;
+      }
+
+      .folder-tabs::-webkit-scrollbar-track {
+        background: rgba(13, 17, 23, 0.3);
+      }
+
+      .folder-tabs::-webkit-scrollbar-thumb {
+        background: rgba(168, 85, 247, 0.3);
+        border-radius: 999px;
+      }
+      
+      .folder-tabs::-webkit-scrollbar-thumb:hover {
+        background: rgba(168, 85, 247, 0.6);
+      }
+
+      .folder-tabs-scroll {
+        flex: 0 0 34px;
+        border: 0;
+        border-right: 1px solid rgba(148, 163, 184, 0.1);
+        background: rgba(22, 27, 34, 0.4);
+        color: var(--text-secondary);
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      .folder-tabs-scroll:hover:not(:disabled) {
+        color: var(--text-primary);
+        background: rgba(168, 85, 247, 0.05);
+      }
+
+      .folder-tabs-scroll:last-child {
+        border-right: 0;
+        border-left: 1px solid rgba(148, 163, 184, 0.1);
+      }
+
+      .folder-tabs-scroll:disabled {
+        color: #30363d;
+        cursor: default;
+      }
+
+      .folder-tab {
+        flex: 0 0 auto;
+        padding: 8px 16px;
+        background: rgba(22, 27, 34, 0.4);
+        border: 1px solid rgba(148, 163, 184, 0.08);
+        border-bottom: none;
+        border-radius: 6px 6px 0 0;
+        color: var(--text-secondary);
+        font-weight: 600;
+        font-size: 13px;
+        cursor: pointer;
+        transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+        white-space: nowrap;
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+      }
+      /* The real in-game folder-tab icon (techtree_<x>_tab.dds is a 2-frame sprite; show frame 1). */
+      .folder-tab .tab-game-icon {
+        flex: 0 0 auto;
+        width: 40px;
+        height: 19px;
+        background-size: 200% 100%;
+        background-position: left center;
+        background-repeat: no-repeat;
+        image-rendering: -webkit-optimize-contrast;
+      }
+
+      .folder-tab:hover {
+        background: rgba(168, 85, 247, 0.05);
+        color: var(--text-primary);
+        border-color: rgba(168, 85, 247, 0.2);
+      }
+
+      /* #research-tab-reorder — make "these can be dragged now" visible rather than something to discover.
+         The strip only takes this appearance while Reorder mode is on. */
+      .folder-tabs.tabs-reordering {
+        background: rgba(31, 111, 235, 0.06);
+        border-radius: 8px 8px 0 0;
+        outline: 1px dashed rgba(88, 166, 255, 0.35);
+        outline-offset: 2px;
+      }
+      .folder-tab.tab-reorderable {
+        cursor: grab;
+        border-color: rgba(88, 166, 255, 0.45);
+      }
+      .folder-tab.tab-reorderable:active { cursor: grabbing; }
+      /* A grip, so the tab reads as a handle and not just a highlighted button. */
+      .folder-tab.tab-reorderable::before {
+        content: "⠿";
+        color: #58a6ff;
+        font-size: 13px;
+        line-height: 1;
+        opacity: 0.75;
+      }
+      .folder-tab.tab-reorderable:hover {
+        background: rgba(88, 166, 255, 0.12);
+        border-color: #58a6ff;
+      }
+      /* A tab with no folder in the mod's research screen cannot be written to the game, so it is visibly
+         excluded instead of silently ignoring the drag. */
+      .folder-tab.tab-not-reorderable {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+      .folder-tab.tab-dragging {
+        opacity: 0.45;
+        transform: scale(0.97);
+      }
+      /* Where it will land, shown BEFORE the drop rather than after. */
+      .folder-tab.tab-drop-before { box-shadow: inset 3px 0 0 0 #58a6ff; }
+      .folder-tab.tab-drop-after  { box-shadow: inset -3px 0 0 0 #58a6ff; }
+
+      .folder-tab.active {
+        background: rgba(168, 85, 247, 0.15) !important;
+        border-color: var(--accent-purple) !important;
+        color: #c084fc !important;
+        box-shadow: 0 -2px 12px rgba(168, 85, 247, 0.15);
+        text-shadow: 0 0 8px rgba(168, 85, 247, 0.3);
+      }
+
+      .canvas-container {
+        flex: 1;
+        overflow: auto;
+        position: relative;
+        cursor: grab;
+        background-color: #0b0f19;
+        background-image: radial-gradient(circle at 50% 30%, rgba(168, 85, 247, 0.08) 0%, rgba(15, 20, 28, 0) 70%);
+      }
+
+      /* BACKGROUND ART ON = show the game, not the editor's styling (#bg-accurate). The purple wash and
+         the 80px helper grid are editor furniture: harmless on an empty canvas, but with the folder's
+         real art behind the techs they tint it and print a grid over it, which is exactly the "colour
+         that lights through the picture" that stops it reading like the game. Both are suppressed while
+         the art is shown and come straight back when it is off. */
+      .canvas-container.bg-on { background-image: none; background-color: #000; }
+      .research-canvas.bg-on { background-image: none; }
+
+      .canvas-container:active {
+        cursor: grabbing;
+      }
+
+      .research-canvas {
+        width: 5200px;
+        height: 2400px;
+        position: relative;
+        background-color: transparent;
+        background-image:
+          linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+          linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+        background-size: 80px 80px, 80px 80px;
+      }
+      /* The game draws a themed image behind each tab (server room for electronics, industrial for
+         civilian, artillery photos…). This layer sits BEHIND the year rail (z8), connectors (z2) and
+         nodes — purely cosmetic, never affects tech placement. background-image set per folder in JS. */
+      .research-bg {
+        position: absolute;
+        top: 0; left: 0; width: 100%; height: 100%;
+        z-index: 0;
+        background-repeat: no-repeat;
+        background-position: left top;
+        /* The image's OWN size, because that is what HOI4 draws: a tech-tree backdrop is a plain
+           iconType over a plain spriteType, so the .dds renders at its native pixels. Stretching to
+           100%% 100%% of this element blew vanilla's 959x715 infantry art up to the 5200x2400 scroll
+           canvas. applyResearchBgPreview() sets the exact pixel size (natural x authored scale);
+           `auto` is the same thing for the resting state before it runs. #bg-scale-is-canvas-percent */
+        background-size: auto;
+        /* FULL STRENGTH (#bg-accurate). This was 0.5, which is why the art never looked like the game:
+           at half opacity the editor's own dark navy and its purple wash showed straight through the
+           picture and tinted it. The game draws the art opaque, so we do too. */
+        opacity: 1;
+        pointer-events: none;
+        /* Composite the (large, stretched) background image on its OWN GPU layer so it's rasterised once
+           and merely re-composited — instead of being REPAINTED on every renderCanvas node rebuild (a
+           tech click rebuilds the node layer). This is what stops a background upload "lagging the whole
+           program". Only costs a layer while the background is actually shown (display:none otherwise). */
+        transform: translateZ(0);
+        will-change: transform;
+        backface-visibility: hidden;
+      }
+
+      /* Year markers — gold-yellow labels on top, dashed lines down the full canvas */
+      /* RETIRED: the old sticky year rail (top strip / left gutter). Years now render as individual
+         .research-gui-year objects at their exact in-game pixels — no bar reserves any screen edge.
+         The container stays in the DOM (renderYearMarkers no-ops into it) but never paints. #year-objects */
+      .year-markers { display: none; }
+
+      .year-marker {
+        position: absolute;
+        top: 0;
+        bottom: -2400px;
+        width: 1px;
+        border-left: 1px dashed rgba(168, 85, 247, 0.16);
+        font-family: 'Inter', sans-serif;
+      }
+      /* Only the label box is clickable (the guide line stays inert so it never blocks tech nodes). */
+      .year-marker-label {
+        position: absolute;
+        top: 6px;
+        left: 8px;
+        color: #c084fc;
+        /* game year font: hoi_36header = Orator Std (a slab-serif); sized to read like the in-game year stamp. */
+        font-family: 'Rockwell', 'Bookman Old Style', 'Courier New', monospace;
+        font-size: 19px;
+        font-weight: 700;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.85);
+        letter-spacing: 0.5px;
+        white-space: nowrap;
+        pointer-events: auto;
+        cursor: pointer;
+        padding: 0 4px;
+        border-radius: 4px;
+        transition: background 0.15s;
+      }
+      .year-marker-label:hover { background: rgba(168, 85, 247, 0.22); }
+      /* The pixel-perfect year glyph raster (real hoi_36header atlas). Crisp, no smoothing/scaling blur. */
+      .year-glyph { display: block; image-rendering: pixelated; -ms-interpolation-mode: nearest-neighbor; }
+      /* Section-subtitle glyph raster (real hoi_33 atlas, word-wrapped to the authored maxWidth). */
+      .gui-label-glyph { display: block; image-rendering: pixelated; -ms-interpolation-mode: nearest-neighbor; }
+      /* In-game YEAR stamps, now placed as individual movable text objects at their exact authored pixel (like
+         section labels) instead of a sticky side/top rail. z-index 4 = UNDER the tech nodes (z5), matching how
+         the game draws year instantTextBoxTypes behind the boxes; they sit in the era margins so stay visible.
+         Drag to reposition, double-click to change the value. Supports the same year twice (left+right). */
+      .research-gui-year {
+        position: absolute;
+        z-index: 4;
+        cursor: grab;
+        user-select: none;
+        /* NO padding: the glyph raster is now the game's full authored textbox, so the element's top-left IS
+           the authored pixel. Any padding here shifts every stamp off its in-game position. #text-box-raster */
+        border-radius: 4px;
+        transition: background 0.12s;
+      }
+      .research-gui-year:hover { background: rgba(168, 85, 247, 0.20); }
+      .research-gui-year.selected { outline: 2px solid var(--accent-purple); background: rgba(13, 17, 23, 0.55); }
+      .research-gui-year .year-edit-input { width: 68px; }
+      /* Game-accurate view: no dashed guide line (HOI4 has none), and the year reads in a neutral game-like tone. */
+      .year-markers.compact .year-marker { border-left: none; }
+      .year-markers.compact.vertical .year-marker { border-top: none; }
+      .year-markers.compact .year-marker-label { color: #e6ddc4; }
+      /* Selected year marker (its design toolbar is showing). */
+      .year-marker-label.selected { outline: 2px solid var(--accent-purple); background: rgba(168, 85, 247, 0.28); }
+      /* The design toolbar + font handle sit inside the year strip (pointer-events:none) — re-enable them. */
+      .year-toolbar { pointer-events: auto; z-index: 60; }
+      .year-toolbar input[type="number"] { -moz-appearance: textfield; }
+      .year-marker .ann-resize-handle { pointer-events: auto; }
+      /* A3: free-text annotation labels placed on the tree (editor layer). */
+      .research-annotation {
+        position: absolute;
+        /* Above the tech nodes (z5) so a label is never hidden behind a card, and always well above the
+           background art (z0) so it can't "disappear" when the background is on. */
+        z-index: 6;
+        color: #f0e6ff;
+        font-size: 20px;
+        font-weight: 700;
+        text-shadow: 0 1px 3px rgba(0,0,0,0.95);
+        letter-spacing: 0.3px;
+        white-space: pre-wrap;
+        max-width: 480px;
+        padding: 2px 7px;
+        border-radius: 5px;
+        cursor: grab;
+        user-select: none;
+        /* A subtle always-on backing so the text stays readable over the (opacity-0.5) background image. */
+        background: rgba(13, 17, 23, 0.42);
+      }
+      .research-annotation:hover { background: rgba(168, 85, 247, 0.22); }
+      .research-annotation.selected { outline: 2px solid var(--accent-purple); background: rgba(13, 17, 23, 0.72); }
+      .research-annotation.editing { cursor: text; user-select: text; outline: 2px solid var(--accent-purple); background: rgba(13, 17, 23, 0.9); }
+      /* In-game section labels parsed from the tech-tree gui (read-only text; amber + uppercase so they read
+         as the game's own section titles, distinct from the user's purple annotations). Draggable to reposition. */
+      .research-gui-label {
+        position: absolute;
+        /* UNDER the tech nodes (z5), above the connector lines (z2) — the game defines subtitles BEFORE the
+           gridboxes in the .gui, so it draws them behind the boxes: an inline lane-header that overlaps its
+           lane's first box is HIDDEN behind that box in-game (only the part in the gap shows). Drawing them on
+           top (the old z6) was the "text overlapping techs" that doesn't match the game. #label-under-techs */
+        z-index: 4;
+        color: #e3b341;
+        font-size: 15px;
+        font-weight: 800;
+        letter-spacing: 0.6px;
+        text-transform: uppercase;
+        text-shadow: 0 1px 3px rgba(0,0,0,0.95);
+        white-space: nowrap;
+        padding: 2px 8px;
+        border-radius: 5px;
+        cursor: grab;
+        user-select: none;
+        /* NO resting pill/edge: the glyph raster is now the game's FULL authored textbox (mostly transparent —
+           e.g. naval battleships is a 600px-wide box), so any resting background would draw a huge dark slab
+           the game doesn't have. Hover keeps the affordance tint. #text-box-raster */
+        background: transparent;
+      }
+      .research-gui-label:hover { background: rgba(227, 179, 65, 0.16); }
+      /* Being inline-edited (single click): show a caret + editable outline, and let the text wrap. */
+      .research-gui-label.editing {
+        cursor: text; white-space: normal; outline: none;
+        background: rgba(13, 17, 23, 0.9);
+        box-shadow: 0 0 0 2px var(--accent-purple, #a855f7);
+      }
+      /* Per-label font-size control (A− [size] A+), shown on hover; changing it writes the in-game gui font. */
+      .lblfont-toolbar {
+        position: absolute; z-index: 12; display: flex; align-items: center; gap: 3px;
+        background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 2px 4px;
+        box-shadow: 0 6px 18px rgba(0,0,0,0.5); user-select: none; white-space: nowrap;
+      }
+      .lblfont-btn {
+        background: #21262d; border: 1px solid #30363d; color: #e3b341; border-radius: 4px;
+        font-size: 12px; font-weight: 800; line-height: 1.2; padding: 1px 6px; cursor: pointer;
+      }
+      .lblfont-btn:hover { background: #30363d; }
+      .lblfont-size { color: #c9d1d9; font-size: 11px; font-family: monospace; min-width: 16px; text-align: center; }
+      /* Labels whose tech group Nova couldn't confidently match get a dashed hint — drag them where they belong. */
+      .research-gui-label.unplaced { opacity: 0.7; border-left-style: dashed; }
+      /* Font-size drag handle at the annotation's corner (drag up = bigger, down = smaller). */
+      .ann-resize-handle {
+        position: absolute; right: -6px; bottom: -6px; width: 14px; height: 14px;
+        background: var(--accent-purple); border: 2px solid #0d1117; border-radius: 50%;
+        cursor: ns-resize; z-index: 8;
+      }
+      /* Floating mini-toolbar shown for the selected annotation. */
+      .ann-toolbar {
+        position: absolute; z-index: 9; display: flex; align-items: center; gap: 4px;
+        background: #161b22; border: 1px solid #30363d; border-radius: 7px; padding: 4px 6px;
+        box-shadow: 0 8px 22px rgba(0,0,0,0.55); user-select: none; white-space: nowrap;
+      }
+      .ann-toolbar button {
+        background: #21262d; border: 1px solid #30363d; color: #c9d1d9; border-radius: 5px;
+        font-size: 12px; font-weight: 700; padding: 2px 7px; cursor: pointer; line-height: 1.3;
+      }
+      .ann-toolbar button:hover { background: #30363d; }
+      .ann-toolbar button.ann-del:hover { background: #7a2020; border-color: #a33; color: #fff; }
+      .ann-toolbar input { width: 46px; background: #0d1117; border: 1px solid #30363d; color: #c9d1d9;
+        border-radius: 5px; padding: 2px 4px; font-size: 12px; text-align: center; }
+      .ann-toolbar span.ann-tb-label { font-size: 11px; color: #8b949e; }
+      /* Toolbar dropdown menus — collapse the many header buttons into a few grouped menus. */
+      .tb-menu { position: relative; display: inline-block; }
+      .tb-menu-panel {
+        display: none; position: absolute; top: calc(100% + 4px); right: 0; z-index: 10000;
+        background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+        box-shadow: 0 12px 30px rgba(0,0,0,0.55); padding: 6px; min-width: 200px;
+        flex-direction: column; gap: 4px;
+      }
+      .tb-menu.open .tb-menu-panel { display: flex; }
+      .tb-menu-panel .btn { width: 100%; text-align: left; box-sizing: border-box; }
+      /* Mirror year labels repeated along the guide line (read-only — only the primary label edits/drags). */
+      .year-marker-mirror {
+        position: absolute;
+        color: #c084fc;
+        font-size: 12px;
+        font-weight: 700;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+        letter-spacing: 0.5px;
+        white-space: nowrap;
+        pointer-events: none;
+        opacity: 0.6;
+        padding: 1px 4px;
+      }
+      /* A free-floating (2-D) year chip: no long guide line, label sits exactly at the drop point.
+         Selectors are specific enough to beat the .year-markers.vertical .year-marker line rules. */
+      .year-markers .year-marker.free,
+      .year-markers.vertical .year-marker.free {
+        bottom: auto; right: auto; width: auto; height: auto; border: none;
+      }
+      .year-markers .year-marker.free .year-marker-label,
+      .year-markers.vertical .year-marker.free .year-marker-label {
+        top: 0; left: 0; background: rgba(168, 85, 247, 0.14);
+      }
+      .year-edit-input {
+        width: 58px;
+        box-sizing: border-box;
+        font-size: 12px;
+        font-weight: 700;
+        background: #0d1117;
+        color: #e6edf3;
+        border: 1px solid var(--accent-purple);
+        border-radius: 4px;
+        padding: 2px 4px;
+        text-align: center;
+        vertical-align: middle;
+        /* Kill the number-spinner arrows that made the box look "popped" and pushed the first digit out. */
+        -moz-appearance: textfield;
+        appearance: textfield;
+      }
+      .year-edit-input::-webkit-outer-spin-button,
+      .year-edit-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+      /* Vertical (UP) trees: the era axis runs DOWN, so the strip lives on the LEFT and each marker
+         is a horizontal guide line with its label at the left edge. */
+      .year-markers.vertical {
+        top: 0;
+        bottom: 0;
+        left: 0;
+        right: auto;
+        width: 72px;
+        height: auto;
+        /* SOLID gutter (not translucent): boxes scroll BEHIND it — stickYearLabels keeps it pinned to the
+           viewport's left edge, mirroring the game which clips the tree to the right of the year rail. */
+        background: #0b0f19;
+        border-bottom: none;
+        border-right: 1px solid var(--border-premium);
+      }
+      .year-markers.vertical .year-marker {
+        top: 0;
+        bottom: auto;
+        left: 0;
+        right: -5000px;
+        width: auto;
+        height: 1px;
+        border-left: none;
+        border-top: 1px dashed rgba(168, 85, 247, 0.16);
+      }
+      .year-markers.vertical .year-marker-label {
+        top: 2px;
+        left: 4px;
+      }
+
+      /* === Tech node: Modern glassmorphic card === */
+      .tech-node {
+        position: absolute;
+        /* width/height are set inline per-node (small≈square, large=wide). These are fallbacks. */
+        width: 88px;
+        height: 104px;
+        overflow: visible;
+        background: var(--tech-card-bg);
+        border: 1px solid var(--border-premium);
+        border-radius: 8px;
+        color: var(--text-primary);
+        cursor: move;
+        padding: 0;
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+        z-index: 5;
+        user-select: none;
+        font-family: 'Inter', sans-serif;
+      }
+
+      .tech-node:hover {
+        border-color: var(--accent-purple);
+        box-shadow:
+          0 0 18px rgba(168, 85, 247, 0.25),
+          0 6px 16px rgba(0, 0, 0, 0.35);
+        z-index: 50;
+        transform: translateY(-2px);
+        filter: brightness(1.06);
+      }
+
+      .tech-node.selected {
+        border-color: var(--accent-purple) !important;
+        box-shadow:
+          0 0 0 2px var(--accent-purple),
+          0 0 20px rgba(168, 85, 247, 0.45),
+          0 8px 24px rgba(0, 0, 0, 0.4);
+        z-index: 60;
+      }
+
+      /* #custom-folder-tech-drag-discarded — a tech in a tab Nova lays out itself cannot be positioned by
+         hand, so it does not get the move cursor that would promise otherwise. */
+      .tech-node--managed-layout {
+        cursor: default;
+      }
+      .tech-node.vanilla {
+        opacity: 0.92;
+      }
+
+      /* A BASE-GAME tech shown underneath a mod's own (a HOI4 mod is an overlay, so the game loads these
+         whether or not the editor draws them). Dimmed + desaturated so it reads as "not yours, not
+         editable" while staying clearly visible — the whole point is that you can see what you are
+         placing next to. Applied only when the mod HAS techs of its own; in vanilla mode every node is
+         .vanilla and dimming the entire tree would be meaningless. #overlay-blindness */
+      .tech-node.inherited {
+        opacity: 0.6;
+        filter: saturate(0.4);
+      }
+      .tech-node.inherited:hover {
+        opacity: 0.95;
+        filter: none;
+      }
+
+      /* Flash a tech when you jump to it from the search box. */
+      .tech-node.search-flash {
+        animation: techSearchFlash 1.6s ease-out;
+        z-index: 70 !important;
+      }
+      @keyframes techSearchFlash {
+        0%, 100% { box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4); }
+        15% { box-shadow: 0 0 0 3px #fbbf24, 0 0 26px rgba(251, 191, 36, 0.85); }
+        60% { box-shadow: 0 0 0 3px #fbbf24, 0 0 22px rgba(251, 191, 36, 0.6); }
+      }
+
+      /* In-app prompt dialog (Electron has no window.prompt). */
+      .nova-prompt-overlay {
+        position: fixed; inset: 0; background: rgba(0, 0, 0, 0.62);
+        display: flex; align-items: center; justify-content: center; z-index: 200000;
+      }
+      .nova-prompt-box {
+        background: #161b22; border: 1px solid #30363d; border-radius: 10px;
+        padding: 18px; width: 440px; max-width: 90vw;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+      }
+      .nova-prompt-msg { color: #e6edf3; font-size: 13px; margin-bottom: 12px; white-space: pre-wrap; line-height: 1.45; }
+      .nova-prompt-input {
+        width: 100%; box-sizing: border-box; background: #0d1117; border: 1px solid #30363d;
+        color: #e6edf3; border-radius: 6px; padding: 8px 10px; font-size: 13px; outline: none;
+      }
+      .nova-prompt-input:focus { border-color: var(--accent-purple, #a855f7); }
+      .nova-prompt-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+      .nova-prompt-actions button { padding: 7px 16px; border-radius: 6px; font-size: 12px; cursor: pointer; border: 1px solid #30363d; }
+      .nova-prompt-cancel { background: #21262d; color: #c9d1d9; }
+      .nova-prompt-ok { background: var(--accent-purple, #a855f7); color: #fff; border-color: var(--accent-purple, #a855f7); }
+
+      /* Undo toast (e.g. after deleting a tech node). */
+      .nova-toast {
+        position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%);
+        background: #21262d; border: 1px solid #30363d; border-radius: 8px;
+        padding: 10px 12px 10px 16px; display: flex; align-items: center; gap: 14px;
+        color: #e6edf3; font-size: 13px; z-index: 200001; box-shadow: 0 12px 36px rgba(0, 0, 0, 0.55);
+        max-width: 80vw;
+      }
+      .nova-toast-undo {
+        background: var(--accent-purple, #a855f7); color: #fff; border: none;
+        border-radius: 6px; padding: 6px 14px; font-size: 12px; font-weight: 600; cursor: pointer;
+      }
+      .nova-toast-undo:hover { filter: brightness(1.1); }
+
+      /* SMALL item (non-equipment tech): icon on top, name underneath, centered. */
+      .tech-node-body {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+        width: 100%;
+        height: 100%;
+        padding: 4px 3px;
+        box-sizing: border-box;
+      }
+      /* LARGE item (equipment tech): icon on the left, name beside it — like the game's wide item. */
+      .tech-node-large .tech-node-body {
+        flex-direction: row;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 8px;
+      }
+      .tech-node-large .tech-node-icon {
+        width: 60px;
+        height: 60px;
+      }
+      .tech-node-large .tech-node-header {
+        text-align: left;
+        font-size: 10.5px;
+        max-height: 76px;
+        -webkit-line-clamp: 5;
+        flex: 1 1 auto;
+      }
+
+      /* Special-project techs render like any other tech (they are fully editable), but the game only
+         reveals them once their project completes — the badge says "conditional", not "missing". */
+      .tech-sp-badge {
+        position: absolute;
+        top: 1px;
+        right: 2px;
+        font-size: 9px;
+        line-height: 1;
+        padding: 1px 2px;
+        border-radius: 3px;
+        color: #ffd479;
+        background: rgba(0, 0, 0, 0.55);
+        pointer-events: auto;
+        z-index: 3;
+      }
+
+      .tech-node-icon {
+        width: 50px;
+        height: 50px;
+        flex: 0 0 auto;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 6px;
+      }
+
+      .tech-node-icon img {
+        max-width: 92%;
+        max-height: 92%;
+        object-fit: contain;
+        filter: drop-shadow(0 2px 4px rgba(0,0,0,0.8));
+      }
+
+      .tech-node-header {
+        font-family: 'Inter', sans-serif;
+        font-weight: 600;
+        font-size: 9px;
+        text-align: center;
+        color: var(--text-primary);
+        text-shadow: 0 1px 2px rgba(0,0,0,0.6);
+        line-height: 1.12;
+        width: 100%;
+        /* room for up to 4 lines so long names (e.g. "Elevate the Mountaineers") read fully */
+        max-height: 44px;
+        overflow: hidden;
+        display: -webkit-box;
+        -webkit-line-clamp: 4;
+        -webkit-box-orient: vertical;
+        min-width: 0;            /* let the name shrink in the large (row) layout w/o per-char breaks */
+        pointer-events: none;
+      }
+
+      /* Year/cost now live in the side panel (like the game's tooltip), not on the node. */
+      .tech-node-meta { display: none; }
+
+      /* === Compact / game-accurate view: the game's real box mix at the real slot grid ===
+         SMALL upgrade tiles are icon-only (name hidden, on hover); WIDE equipment boxes show the name in a bar at the
+         TOP with a big icon filling below — matching HOI4's item layout (name-top, not name-beside). */
+      .tech-node-compact.tech-node-small .tech-node-header { display: none; }   /* name omitted from HTML too */
+      .tech-node-compact.tech-node-small .tech-node-body { padding: 2px; gap: 0; align-items: center; justify-content: center; }
+      .tech-node-compact.tech-node-small .tech-node-icon { width: 100%; height: 100%; background: transparent; border-radius: 4px; }
+      .tech-node-compact.tech-node-small .tech-node-icon img { max-width: 100%; max-height: 100%; }
+      .tech-node-compact.tech-node-large .tech-node-body { flex-direction: column; gap: 1px; padding: 3px 4px 2px; align-items: stretch; }
+      .tech-node-compact.tech-node-large .tech-node-header { order: -1; flex: 0 0 auto; width: 100%; text-align: left; font-size: 11px; line-height: 1.1; max-height: 24px; -webkit-line-clamp: 2; }
+      .tech-node-compact.tech-node-large .tech-node-icon { order: 0; flex: 1 1 auto; width: 100%; height: auto; min-height: 0; background: transparent; }
+      .tech-node-compact.tech-node-large .tech-node-icon img { max-width: 100%; max-height: 100%; }
+
+      /* === Sub-tech variants: a small icon strip overlaid along the bottom of the item ===
+         Absolutely positioned so it never steals horizontal space from the icon/name (which was
+         squeezing the name into single-character columns on large items with sub-techs). */
+      .tech-node-subtechs {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 3px;
+        display: flex;
+        flex-direction: row;
+        justify-content: center;
+        gap: 3px;
+        pointer-events: auto;
+        z-index: 7;
+      }
+      /* Reserve a little room at the bottom so the name doesn't sit under the sub-tech strip. */
+      .tech-node.has-subtechs .tech-node-body { padding-bottom: 28px; }
+
+      .tech-node.has-subtechs .tech-node-info {
+        padding-right: 24px;
+      }
+
+      .sub-tech-slot {
+        width: 24px;
+        height: 24px;
+        background: rgba(13, 17, 23, 0.8);
+        border: 1px solid var(--border-premium);
+        border-radius: 3px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 1px 2px rgba(0,0,0,0.3);
+        transition: all 0.2s;
+        overflow: hidden;
+      }
+
+      .sub-tech-slot:hover {
+        border-color: var(--accent-purple);
+        box-shadow: 0 0 6px rgba(168, 85, 247, 0.4);
+        transform: scale(1.15);
+        z-index: 12;
+      }
+
+      .sub-tech-slot.selected {
+        border-color: var(--accent-purple);
+        box-shadow: 0 0 8px rgba(168, 85, 247, 0.6);
+      }
+
+      .sub-tech-slot img {
+        width: 20px;
+        height: 20px;
+        object-fit: contain;
+        filter: drop-shadow(0 1px 1px rgba(0,0,0,0.8));
+      }
+
+      .sub-tech-slot.empty {
+        background: rgba(13, 17, 23, 0.4);
+        border-color: rgba(148, 163, 184, 0.1);
+        opacity: 0.4;
+      }
+
+      /* SVG line layers — orthogonal connectors styled like neon circuits */
+      .lines-svg {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 2;
+        overflow: visible;
+      }
+
+      .tech-ref-jump:hover { text-decoration: underline; text-decoration-color: #818cf8; }
+
+      .connector-line {
+        stroke: #818cf8;
+        stroke-width: 2.5px;
+        fill: none;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        opacity: 0.85;
+        filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5));
+        transition: all 0.25s ease;
+      }
+
+      .connector-line.hover-highlight {
+        stroke: #fbbf24 !important;
+        stroke-width: 3.5px !important;
+        opacity: 1 !important;
+        filter: drop-shadow(0 0 5px rgba(251, 191, 36, 0.7));
+      }
+
+      .connector-line.selected {
+        stroke: var(--accent-purple);
+        stroke-width: 3px;
+        opacity: 1;
+        filter: drop-shadow(0 0 6px rgba(168, 85, 247, 0.8));
+      }
+
+      .connector-line.or-branch {
+        stroke-dasharray: 6 3;
+        stroke: #a855f7;
+        opacity: 0.65;
+      }
+
+      .connector-line.subtech-branch {
+        stroke: #4f46e5;
+        stroke-width: 1.5px;
+        opacity: 0.45;
+      }
+
+      .connector-line.dependency {
+        stroke-dasharray: 3 3;
+        stroke: #4b5563;
+      }
+
+      /* Sidebar Form Groups */
+      .form-section {
+        padding: 16px;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+      }
+
+      .form-section h3 {
+        margin: 0 0 12px 0;
+        font-size: 13.5px;
+        color: #c084fc;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+      }
+
+      .form-group {
+        margin-bottom: 14px;
+      }
+
+      .form-group label {
+        display: block;
+        margin-bottom: 6px;
+        color: var(--text-secondary) !important;
+        font-weight: 600 !important;
+        font-size: 11.5px !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.5px !important;
+      }
+
+      .form-group input[type="text"],
+      .form-group input[type="number"],
+      .form-group textarea,
+      .form-group select {
+        width: 100%;
+        padding: 10px 12px !important;
+        background: #0d1117 !important;
+        border: 1px solid rgba(148, 163, 184, 0.15) !important;
+        border-radius: 8px !important;
+        color: #e6edf3 !important;
+        font-size: 13px !important;
+        outline: none !important;
+        transition: border-color 0.2s, box-shadow 0.2s !important;
+      }
+
+      .form-group input:focus,
+      .form-group textarea:focus,
+      .form-group select:focus {
+        border-color: #a855f7 !important;
+        box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.25) !important;
+      }
+
+      .form-group textarea {
+        min-height: 60px;
+        resize: vertical;
+        font-family: monospace;
+      }
+
+      .form-row {
+        display: flex;
+        gap: 12px;
+      }
+
+      .form-row .form-group {
+        flex: 1;
+        margin-bottom: 0;
+      }
+
+      .picture-upload-group {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      }
+      
+      .picture-preview {
+        width: 50px;
+        height: 50px;
+        background: #0d1117;
+        border: 1px dashed rgba(148, 163, 184, 0.2);
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--text-secondary);
+        overflow: hidden;
+      }
+      
+      .picture-preview img {
+        max-width: 90%;
+        max-height: 90%;
+        object-fit: contain;
+      }
+
+      .btn {
+        padding: 10px 18px !important;
+        background: #2ea043 !important;
+        color: #fff !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        border-radius: 8px !important;
+        cursor: pointer !important;
+        font-weight: 600 !important;
+        font-size: 13.5px !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 8px !important;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+      }
+      
+      .btn:hover {
+        background: #34bc4f !important;
+        box-shadow: 0 0 16px rgba(46, 160, 67, 0.35) !important;
+      }
+      
+      .btn-secondary {
+        background: rgba(22, 27, 34, 0.8) !important;
+        border-color: rgba(148, 163, 184, 0.15) !important;
+        color: #c9d1d9 !important;
+      }
+      
+      .btn-secondary:hover {
+        background: rgba(30, 41, 59, 0.6) !important;
+        border-color: var(--accent-purple) !important;
+        box-shadow: 0 4px 12px rgba(168, 85, 247, 0.1) !important;
+      }
+
+      /* Small, muted "repair" utilities (Fix Tab Layout / Fix Tech Icons) — secondary to Save.
+         Selector specificity (html body .btn.btn-fix) must beat the shared styles.css "html body .btn" rule. */
+      html body .btn.btn-fix {
+        padding: 5px 10px !important;
+        font-size: 11px !important;
+        font-weight: 500 !important;
+        background: rgba(22, 27, 34, 0.7) !important;
+        border: 1px solid rgba(148, 163, 184, 0.18) !important;
+        color: #9aa6b2 !important;
+        gap: 5px !important;
+      }
+      html body .btn.btn-fix:hover {
+        background: rgba(30, 41, 59, 0.6) !important;
+        border-color: rgba(148, 163, 184, 0.35) !important;
+        color: #d6dee8 !important;
+      }
+
+      /* Clickable "?" help chips in the sidebar — open a non-blocking modal (never lock inputs). */
+      .sb-help {
+        display: inline-flex; align-items: center; justify-content: center;
+        width: 15px; height: 15px; border-radius: 50%;
+        background: #482f6e; color: #d1b4ff; font-size: 10px; font-weight: bold;
+        cursor: pointer; margin-left: 5px; vertical-align: middle; user-select: none;
+      }
+      .sb-help:hover { background: #5d3b8e; color: #fff; }
+
+      .btn-danger {
+        background: rgba(248, 81, 73, 0.1) !important;
+        border: 1px solid rgba(248, 81, 73, 0.3) !important;
+        color: #f85149 !important;
+      }
+
+      .btn-danger:hover {
+        background: #da3633 !important;
+        border-color: rgba(255, 255, 255, 0.1) !important;
+        color: #fff !important;
+        box-shadow: 0 0 16px rgba(218, 54, 51, 0.4) !important;
+      }
+
+      /* AI generator panel */
+      .ai-generator-panel {
+        background: linear-gradient(135deg, rgba(76, 29, 149, 0.25) 0%, rgba(30, 58, 138, 0.25) 100%) !important;
+        border: 1px solid rgba(139, 92, 246, 0.35) !important;
+        border-radius: 14px !important;
+        padding: 20px !important;
+        backdrop-filter: blur(8px) !important;
+        -webkit-backdrop-filter: blur(8px) !important;
+        box-shadow: 0 4px 20px rgba(139, 92, 246, 0.1) !important;
+        margin-bottom: 24px !important;
+        transition: border-color 0.22s ease !important;
+      }
+      
+      .ai-generator-panel:hover {
+        border-color: rgba(139, 92, 246, 0.5) !important;
+      }
+
+      .ai-generator-panel h3 {
+        margin: 0 0 8px 0 !important;
+        color: #c084fc !important;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 15px !important;
+        font-weight: 700 !important;
+      }
+      
+      .ai-generator-panel textarea {
+        background: rgba(13, 17, 23, 0.7) !important;
+        border: 1px solid rgba(139, 92, 246, 0.25) !important;
+        color: #e2d1fa !important;
+        border-radius: 8px !important;
+        padding: 10px 12px !important;
+        transition: all 0.2s ease !important;
+      }
+
+      .ai-generator-panel textarea:focus {
+        border-color: #a855f7 !important;
+        box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.25) !important;
+      }
+
+      .ai-generator-panel button {
+        background: #8b5cf6 !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        color: #fff !important;
+        font-weight: 600 !important;
+        padding: 10px 20px !important;
+        border-radius: 8px !important;
+        cursor: pointer !important;
+        transition: all 0.2s ease !important;
+      }
+
+      .ai-generator-panel button:hover {
+        background: #7c3aed !important;
+        box-shadow: 0 0 16px rgba(139, 92, 246, 0.4) !important;
+      }
+
+      /* Node linking mode banner */
+      .banner-notification {
+        position: absolute;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(168, 85, 247, 0.9);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: white;
+        padding: 10px 24px;
+        border-radius: 20px;
+        font-weight: 600;
+        font-size: 13px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+        z-index: 100;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        animation: fadeInDown 0.3s ease-out;
+      }
+
+      .banner-notification button {
+        background: rgba(255,255,255,0.2);
+        border: none;
+        color: white;
+        padding: 4px 12px;
+        border-radius: 12px;
+        cursor: pointer;
+        font-size: 11px;
+        font-weight: bold;
+        transition: all 0.2s ease;
+      }
+
+      .banner-notification button:hover {
+        background: rgba(255,255,255,0.3);
+      }
+
+      @keyframes fadeInDown {
+        from {
+          opacity: 0;
+          transform: translate(-50%, -20px);
+        }
+        to {
+          opacity: 1;
+          transform: translate(-50%, 0);
+        }
+      }
+
+      /* Research Slots Bar & Paradox Brushed-Metal Header Styles */
+      .research-slot {
+        background: linear-gradient(180deg, #252a2e 0%, #15181a 100%);
+        border: 1px solid #484e55;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        padding: 4px 8px;
+        gap: 8px;
+        position: relative;
+        overflow: hidden;
+        min-width: 190px;
+        height: 38px;
+        box-shadow: inset 0 1px 3px rgba(255,255,255,0.08), 0 2px 4px rgba(0,0,0,0.4);
+      }
+
+      .research-slot-icon {
+        font-size: 16px;
+      }
+
+      .research-slot-name {
+        font-size: 10px;
+        font-weight: bold;
+        color: #f0f6fc;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 125px;
+      }
+
+      .research-slot-time {
+        font-size: 9px;
+        color: #8b949e;
+      }
+
+      .research-slot-progress-frame {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: #111;
+      }
+
+      .research-slot-progress-bar {
+        height: 100%;
+        background: linear-gradient(90deg, #cd7f32 0%, #ffebad 100%);
+        box-shadow: 0 0 2px #ffebad;
+      }
+
+      .research-slot.empty {
+        border-color: #238636;
+        background: linear-gradient(180deg, #1b241e 0%, #101612 100%);
+        animation: border-glow-green 2s infinite alternate;
+      }
+
+      @keyframes border-glow-green {
+        from { border-color: #238636; box-shadow: 0 0 4px rgba(35,134,54,0.3); }
+        to { border-color: #2ea043; box-shadow: 0 0 10px rgba(46,160,67,0.6); }
+      }
+
+      @keyframes text-blink {
+        0%, 100% { opacity: 0.7; }
+        50% { opacity: 1; }
+      }
+
+      /* === Node State Visual Engine === */
+      .tech-node.locked {
+        border-color: rgba(148, 163, 184, 0.06) !important;
+        opacity: 0.45;
+        filter: grayscale(0.85);
+        background: var(--tech-card-bg-locked) !important;
+      }
+      .tech-node.locked .tech-node-header {
+        color: var(--text-secondary);
+      }
+      .tech-node.locked .tech-node-icon img {
+        filter: opacity(0.5);
+      }
+
+      .tech-node.available {
+        border-color: rgba(59, 130, 246, 0.4) !important;
+        background: var(--tech-card-bg-available) !important;
+        box-shadow:
+          0 0 10px rgba(59, 130, 246, 0.15),
+          0 3px 8px rgba(0,0,0,0.2);
+      }
+      .tech-node.available .tech-node-header {
+        color: var(--text-primary);
+      }
+
+      .tech-node.completed {
+        border-color: var(--researched-green) !important;
+        background: var(--tech-card-bg-completed) !important;
+        box-shadow:
+          0 0 12px rgba(46, 160, 67, 0.2),
+          0 3px 8px rgba(0,0,0,0.35);
+      }
+      .tech-node.completed .tech-node-header {
+        color: #cdf5d4;
+      }
+
+      .tech-node.researching {
+        animation: premium-pulse 2s ease-in-out infinite;
+      }
+
+      @keyframes premium-pulse {
+        0%, 100% {
+          border-color: rgba(168, 85, 247, 0.4);
+          box-shadow:
+            0 0 12px rgba(168, 85, 247, 0.2),
+            0 3px 8px rgba(0,0,0,0.3);
+        }
+        50% {
+          border-color: var(--accent-purple);
+          box-shadow:
+            0 0 20px rgba(168, 85, 247, 0.5),
+            0 3px 8px rgba(0,0,0,0.3);
+        }
+      }
+
+      .researched-badge {
+        position: absolute !important;
+        top: -8px !important;
+        right: -8px !important;
+        background: var(--researched-green);
+        color: #fff;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        font-size: 11px !important;
+        font-weight: bold;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 0 6px var(--researched-green-glow), 0 2px 4px rgba(0,0,0,0.4);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        z-index: 8;
+      }
+
+      /* Mutually Exclusive Swords overlay */
+      .exclusive-swords {
+        position: absolute;
+        font-size: 20px;
+        z-index: 12;
+        color: #ef4444;
+        text-shadow: 0 0 8px rgba(239, 68, 68, 0.6);
+        pointer-events: none;
+        transform: translate(-50%, -50%);
+        user-select: none;
+      }
+
+      .delete-tab-btn:hover {
+        color: #ef4444 !important;
+        transform: scale(1.2);
+      }
+
+      .empty-tree-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(11, 7, 17, 0.8);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        z-index: 100;
+      }
+      
+      .empty-tree-card {
+        background: rgba(22, 27, 34, 0.95);
+        border: 1px solid rgba(168, 85, 247, 0.3);
+        border-radius: 14px;
+        padding: 32px;
+        max-width: 480px;
+        text-align: center;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 15px rgba(168, 85, 247, 0.15);
+        animation: fadeInScale 0.3s ease-out;
+      }
+      
+      @keyframes fadeInScale {
+        from { opacity: 0; transform: scale(0.95); }
+        to { opacity: 1; transform: scale(1); }
+      }
+      
+      .empty-tree-icon {
+        font-size: 48px;
+        margin-bottom: 16px;
+      }
+      
+      .empty-tree-card h2 {
+        font-size: 20px;
+        color: #f0f6fc;
+        margin: 0 0 8px 0;
+        font-family: sans-serif;
+        font-weight: 700;
+      }
+      
+      .empty-tree-card p {
+        font-size: 13px;
+        color: var(--text-secondary);
+        line-height: 1.5;
+        margin: 0 0 24px 0;
+      }
+      
+      .empty-tree-actions {
+        display: flex;
+        gap: 12px;
+        justify-content: center;
+      }
+      
+      .empty-tree-actions button {
+        padding: 10px 18px;
+        font-size: 13px;
+        font-weight: 600;
+        border-radius: 8px;
+        border: none;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      /* === Paradox header and selectors === */
+      .paradox-header-container {
+        background: rgba(22, 27, 34, 0.4) !important;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.12) !important;
+      }
+
+      /* Modals styling overrides */
+      .modal {
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+      }
+
+      .modal-content {
+        background-color: rgba(22, 27, 34, 0.95) !important;
+        border: 1px solid rgba(168, 85, 247, 0.3) !important;
+        border-radius: 14px !important;
+        box-shadow: 0 12px 40px rgba(0,0,0,0.6), 0 0 20px rgba(168, 85, 247, 0.15) !important;
+      }
+    </style>
+    <link rel="icon" href="favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" href="favicon.png">
+</head>
+  <body>
+    <div id="topDock" class="top-dock">
+      <nav class="suite-nav">
+        <a href="home.html" class="suite-nav-link" data-i18n="nav.home">Home</a>
+        <a href="country-setup.html" class="suite-nav-link" data-i18n="nav.countrySetup">Country Setup</a>
+        <a href="characters.html" class="suite-nav-link" data-i18n="nav.characters">Characters</a>
+        <a href="ideas.html" class="suite-nav-link" data-i18n="nav.nationalSpirits">National Spirits</a>
+        <a href="research.html" class="suite-nav-link active" data-i18n="nav.researchTree">Research Tree</a>
+        <a href="index.html" class="suite-nav-link" data-i18n="nav.focusTree">Focus Tree</a>
+        <a href="events.html" class="suite-nav-link" data-i18n="nav.events">Events</a>
+        <a href="decisions.html" class="suite-nav-link" data-i18n="nav.decisions">Decisions</a>
+        <a href="map.html" class="suite-nav-link" data-i18n="nav.mapEditor">Map Editor</a>
+        <a href="army.html" class="suite-nav-link" data-i18n="nav.military">Military</a>
+        <a href="modhealth.html" class="suite-nav-link" data-i18n="nav.modHealth">Mod Health</a>
+
+        <!-- target="_blank" is load-bearing, not decoration. main.js blocks in-window navigation to any
+             non-app origin (will-navigate -> preventDefault + "network blocked" warning), but routes a
+             window-open to an https URL through shell.openExternal. So this opens the user's real browser;
+             a plain href would look like an error. -->
+        <a href="https://discord.gg/Z6P23hjEsM" target="_blank" rel="noopener noreferrer"
+           class="suite-nav-link suite-nav-discord" style="margin-left:auto;"
+           title="Join the Nova Discord — report bugs and ask questions"><svg class="suite-nav-discord-mark" viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true" focusable="false"><path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z"/></svg>Discord</a>
+      </nav>
+      <header class="app-header">
+        <div class="title-row">
+          <h1>HOI4 Research Tree Maker</h1>
+          <div class="header-actions">
+            <div class="mod-selector-container" style="display: flex; align-items: center; gap: 8px; margin-right: 16px; background: rgba(22, 27, 34, 0.6); padding: 6px 12px; border-radius: 6px; border: 1px solid rgba(148, 163, 184, 0.12);">
+              <span style="font-size: 12px; color: #8b949e; font-weight: 600; white-space: nowrap;">📁 Active Mod:</span>
+              <select id="headerModSelector" style="background: #0d1117; border: 1px solid rgba(148, 163, 184, 0.15); color: #e6edf3; border-radius: 4px; padding: 4px 8px; font-size: 12px; outline: none; cursor: pointer; min-width: 150px; max-width: 300px;"></select>
+            </div>
+            <!-- Country Selector -->
+            <div class="country-selector-container" style="display: flex; align-items: center; gap: 8px; margin-right: 16px; background: rgba(22, 27, 34, 0.6); padding: 6px 12px; border-radius: 6px; border: 1px solid rgba(148, 163, 184, 0.12);">
+              <span style="font-size: 12px; color: #8b949e; font-weight: 600; white-space: nowrap;">🌍 Country:</span>
+              <select id="headerCountrySelector" style="background: #0d1117; border: 1px solid rgba(148, 163, 184, 0.15); color: #e6edf3; border-radius: 4px; padding: 4px 8px; font-size: 12px; outline: none; cursor: pointer; min-width: 100px; max-width: 150px;"></select>
+            </div>
+            <!-- 📅 Years menu — years are individual in-place text objects now (exactly like in-game) -->
+            <div class="tb-menu">
+              <button type="button" class="btn btn-fix tb-menu-trigger" title="Year tools">📅 Years ▾</button>
+              <div class="tb-menu-panel">
+                <button class="btn btn-fix" id="addYearBtn" type="button" title="Add a year object to this tab in the editor. It appears mid-screen — drag it where you want, double-click to set the year. Editor-side only: Save does not write it into the mod's .gui yet.">📅 Add Year</button>
+                <button class="btn btn-fix" id="deleteYearBtn" type="button" title="Delete a year in the editor. Click this, then click the year to remove (a mod's own year is hidden, your added ones are removed). Editor-side only: the mod's .gui is not changed.">🗑 Delete Year</button>
+                <button class="btn btn-fix" id="resetYearsBtn" type="button" title="Undo every year move/edit/hide you made on this mod — back to exactly what the mod's gui defines.">↺ Reset year edits</button>
+                <!-- #year-objects-are-editor-only — this line used to read "Edits are saved with your mod session", which
+                     readers took to mean the mod. These three buttons drive the in-place year objects, whose edits live in
+                     Nova's localStorage; Save's year hook writes the RULER model above the canvas instead. Wiring these
+                     into the writer is real work (id scheme, authored maxWidth/font round-trip) and needs in-game checking,
+                     so until then the panel says plainly what it does. -->
+                <div style="font-size: 10px; color: #6e7681; padding: 4px 8px; line-height: 1.4;">Years sit exactly where the game draws them — drag one to move it, double-click to change it. These are <b>editor-side layout edits</b>: they're kept per mod and survive a reload, but Save doesn't write them into the mod's <code>.gui</code> yet. To change the years the game shows, drag the markers on the year ruler above the canvas — those Save does write.</div>
+              </div>
+            </div>
+            <!-- 🎨 Display menu (background, canvas, labels, hidden techs) -->
+            <div class="tb-menu">
+              <button type="button" class="btn btn-fix tb-menu-trigger" title="Background, canvas size, labels & hidden techs">🎨 Display ▾</button>
+              <div class="tb-menu-panel">
+                <button class="btn btn-fix tb-stay-open" id="researchBgBtn" type="button" title="Show each folder's in-game background art behind the techs. Click to toggle (per mod).">🖼 Background: off</button>
+                <button class="btn btn-fix" id="researchSetBgBtn" type="button" title="Upload a picture to use as THIS folder's research background — shows behind the techs, in-game too.">🖼 Set bg…</button>
+                <button class="btn btn-fix" id="researchCanvasSizeBtn" type="button" title="Set the working canvas size (width × height) — like the focus tree. Grow it for more room to arrange techs, or shrink the oversized default. Editor-only, saved per mod.">📐 Canvas size…</button>
+                <button class="btn btn-fix" id="addTextBtn" type="button" title="Place a free-text label on the tree: click to select, double-click to edit, drag to move, resize its font. Editor annotation (per mod).">📝 Add text</button>
+                <button class="btn btn-fix tb-stay-open" id="showHiddenBtn" type="button" title="A tech flagged “Hidden” (or gated out by the DLC filter) disappears from the tree. Click to SHOW such techs (dimmed) so you can find and edit them.">🙈 Hidden techs: off</button>
+                <button class="btn btn-fix tb-stay-open" id="showBaseTechsBtn" type="button" title="The base game's technologies are drawn read-only alongside your mod's — this is what the game actually loads, since a mod is an overlay. Click to hide them while you work.">🏛 Base game: shown</button>
+                <!-- Only appears when the mod's own copy of countrytechtreeview.gui has fallen behind the
+                     installed game's — see #stale-gui-copy. Hidden by JS otherwise. -->
+                <button class="btn btn-fix tb-stay-open" id="staleGuiBtn" type="button" style="display:none; color:#f0883e;">⚠ Layout file</button>
+                <button class="btn btn-fix tb-stay-open" id="guiLabelsBtn" type="button" title="Show the in-game section titles (e.g. SMALL ARMS, SUPPORT WEAPONS) that the game draws on this tree. Read-only text; drag any to reposition it. Editor-only, per mod.">🏷 Section labels: off</button>
+                <!-- the tree always renders game-accurately (real slot grid, real box mix) — there is no other view. #accurate-only -->
+              </div>
+            </div>
+            <input type="file" id="researchBgFileInput" accept="image/png,image/jpeg,image/bmp" style="display:none" />
+            <button class="btn" id="saveAllBtn">Save Changes</button>
+          </div>
+        </div>
+      </header>
+    </div>
+
+    <!-- Canvas-size popover (editor workspace sizing, mirrors the focus tree's Manual Workspace Sizing) -->
+    <div id="researchCanvasSizePanel" style="display:none; position:fixed; z-index:9000; top:120px; right:24px; width:290px; background:#161b22; border:1px solid #30363d; border-radius:10px; box-shadow:0 14px 34px rgba(0,0,0,0.6); padding:16px; color:#c9d1d9;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+        <strong style="font-size:14px; color:#e6edf3;">📐 Canvas Size</strong>
+        <span id="researchCanvasSizeClose" style="cursor:pointer; color:#8b949e; font-size:22px; line-height:1;">&times;</span>
+      </div>
+      <p style="font-size:11px; color:#8b949e; margin:0 0 4px;">Override the auto-sizing — grow or shrink the canvas to any size. “Fit to techs” wraps them tightly on both sides. Editor-only, saved per mod.</p>
+      <p id="researchCanvasSizeHint" style="font-size:12px; color:#58a6ff; margin:0 0 12px; font-variant-numeric:tabular-nums;">—</p>
+      <div style="display:flex; gap:10px;">
+        <div style="flex:1; display:flex; flex-direction:column; gap:4px;"><span style="font-size:11px; color:#8b949e;">WIDTH (px)</span><input id="researchCanvasWInput" type="number" placeholder="Auto" style="width:100%; box-sizing:border-box; padding:6px 8px; background:#0d1117; border:1px solid #30363d; color:#c9d1d9; border-radius:6px;" /></div>
+        <div style="flex:1; display:flex; flex-direction:column; gap:4px;"><span style="font-size:11px; color:#8b949e;">HEIGHT (px)</span><input id="researchCanvasHInput" type="number" placeholder="Auto" style="width:100%; box-sizing:border-box; padding:6px 8px; background:#0d1117; border:1px solid #30363d; color:#c9d1d9; border-radius:6px;" /></div>
+      </div>
+      <div style="display:flex; gap:8px; margin-top:14px;">
+        <button id="researchCanvasFitBtn" class="btn btn-fix" type="button" style="flex:1;" title="Shrink the canvas to wrap the techs tightly">Fit to techs</button>
+        <button id="researchCanvasResetBtn" class="btn btn-fix" type="button" style="flex:1;" title="Back to the automatic size">Reset (auto)</button>
+      </div>
+      <div style="border-top:1px solid #30363d; margin-top:16px; padding-top:14px;">
+        <strong style="font-size:13px; color:#e6edf3;">🖼 Background (in-game)</strong>
+        <p style="font-size:11px; color:#8b949e; margin:4px 0 10px;"><span id="researchBgFolderLabel" style="color:#c9d1d9;">This folder</span>'s background art. <b style="color:#c9d1d9;">Fit</b> is the vanilla shape — position 0,0 at scale 1, drawn at the image's own size (the default; art you upload is pre-sized to fill the tab). Switch to <b style="color:#c9d1d9;">Manual</b> to place it with X/Y/Scale. Edits countrytechtreeview.gui (auto-backed up).</p>
+        <div id="researchBgModeRow" style="display:flex; gap:16px; margin-bottom:10px; font-size:12px; color:#c9d1d9;">
+          <label style="display:flex; align-items:center; gap:5px; cursor:pointer;"><input type="radio" name="researchBgMode" value="fit" id="researchBgModeFit" checked /> Fit to viewport</label>
+          <label style="display:flex; align-items:center; gap:5px; cursor:pointer;"><input type="radio" name="researchBgMode" value="manual" id="researchBgModeManual" /> Manual (X/Y/Scale)</label>
+        </div>
+        <div id="researchBgManualControls">
+          <div style="display:flex; gap:8px;">
+            <div style="flex:1; display:flex; flex-direction:column; gap:4px;"><span style="font-size:11px; color:#8b949e;">X</span><input id="researchBgXInput" type="number" placeholder="0" style="width:100%; box-sizing:border-box; padding:6px 8px; background:#0d1117; border:1px solid #30363d; color:#c9d1d9; border-radius:6px;" /></div>
+            <div style="flex:1; display:flex; flex-direction:column; gap:4px;"><span style="font-size:11px; color:#8b949e;">Y</span><input id="researchBgYInput" type="number" placeholder="0" style="width:100%; box-sizing:border-box; padding:6px 8px; background:#0d1117; border:1px solid #30363d; color:#c9d1d9; border-radius:6px;" /></div>
+            <div style="flex:1; display:flex; flex-direction:column; gap:4px;"><span style="font-size:11px; color:#8b949e;">SCALE</span><input id="researchBgScaleInput" type="number" step="0.05" min="0.1" max="10" placeholder="1" style="width:100%; box-sizing:border-box; padding:6px 8px; background:#0d1117; border:1px solid #30363d; color:#c9d1d9; border-radius:6px;" /></div>
+          </div>
+        </div>
+        <div id="researchBgTransformStatus" style="font-size:11px; color:#8b949e; margin-top:8px; min-height:14px;"></div>
+        <button id="researchBgApplyBtn" class="btn btn-fix" type="button" style="width:100%; margin-top:8px;">Apply to game</button>
+      </div>
+      <div style="border-top:1px solid #30363d; margin-top:16px; padding-top:14px;">
+        <strong style="font-size:13px; color:#e6edf3;">📁 Folder viewport (in-game)</strong>
+        <p style="font-size:11px; color:#8b949e; margin:4px 0 10px;">Move &amp; resize the whole <span id="researchFolderLabel" style="color:#c9d1d9;">folder</span> view in-game. Size is pixels (e.g. <code>900</code>) or a percentage (<code>100%</code> = fill). Edits the gui (backed up).</p>
+        <div style="display:flex; gap:8px;">
+          <div style="flex:1; display:flex; flex-direction:column; gap:4px;"><span style="font-size:11px; color:#8b949e;">X</span><input id="researchFolderXInput" type="number" placeholder="0" style="width:100%; box-sizing:border-box; padding:6px 8px; background:#0d1117; border:1px solid #30363d; color:#c9d1d9; border-radius:6px;" /></div>
+          <div style="flex:1; display:flex; flex-direction:column; gap:4px;"><span style="font-size:11px; color:#8b949e;">Y</span><input id="researchFolderYInput" type="number" placeholder="0" style="width:100%; box-sizing:border-box; padding:6px 8px; background:#0d1117; border:1px solid #30363d; color:#c9d1d9; border-radius:6px;" /></div>
+        </div>
+        <div style="display:flex; gap:8px; margin-top:8px;">
+          <div style="flex:1; display:flex; flex-direction:column; gap:4px;"><span style="font-size:11px; color:#8b949e;">WIDTH</span><input id="researchFolderWInput" type="text" placeholder="100%" style="width:100%; box-sizing:border-box; padding:6px 8px; background:#0d1117; border:1px solid #30363d; color:#c9d1d9; border-radius:6px;" /></div>
+          <div style="flex:1; display:flex; flex-direction:column; gap:4px;"><span style="font-size:11px; color:#8b949e;">HEIGHT</span><input id="researchFolderHInput" type="text" placeholder="100%" style="width:100%; box-sizing:border-box; padding:6px 8px; background:#0d1117; border:1px solid #30363d; color:#c9d1d9; border-radius:6px;" /></div>
+        </div>
+        <div id="researchFolderStatus" style="font-size:11px; color:#8b949e; margin-top:8px; min-height:14px;"></div>
+        <button id="researchFolderApplyBtn" class="btn btn-fix" type="button" style="width:100%; margin-top:8px;">Apply to game</button>
+      </div>
+    </div>
+
+    <div id="vanillaBanner" style="display: none; background: linear-gradient(90deg, #2a1800, #1a1000); border-bottom: 2px solid #d29922; padding: 10px 20px; text-align: center; font-size: 13px; color: #d29922; font-weight: 600;">
+      ⚠️ You are viewing <strong>Vanilla Game Files</strong> (read-only). To save changes, select or <a href="home.html" style="color: #58a6ff; text-decoration: underline;">create a mod</a> first.
+    </div>
+
+    <!-- Research Speed header removed (not meaningful in the editor). -->
+
+    <div class="research-layout">
+      <!-- SIDEBAR -->
+      <aside class="research-sidebar">
+
+        <div id="editorPanel" style="display: none;">
+          <!-- 1. AI Technology Generator -->
+          <div class="form-section" style="padding-bottom: 8px;">
+            <div class="ai-generator-panel">
+              <h3>✨ AI Tech & Weapon Generator <span id="aiLogicHelpBtn" style="display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; background: #482f6e; color: #d1b4ff; font-size: 11px; cursor: pointer; font-weight: bold;" title="How does this work?">?</span></h3>
+              <textarea id="aiPrompt" placeholder="e.g. 1940 advanced rifle. Soft attack = 12, defense = 30. Adds 5% defense modifier to infantry." style="width: 100%; padding: 8px; background: #0b0711; border: 1px solid #482f6e; color: #e2d1fa; border-radius: 4px; min-height: 50px; margin-bottom: 8px; font-size: 12px;"></textarea>
+              <button class="btn" id="generateAiBtn" style="background: #5d3b8e; border-color: #8c60ce; width: 100%;">Generate Script</button>
+              <div id="aiStatus" style="font-size: 11px; color: #8fa4b8; margin-top: 6px; text-align: center;"></div>
+            </div>
+          </div>
+
+          <!-- 2. Technology Information -->
+          <div class="form-section">
+            <h3>Technology Details</h3>
+
+            <div class="form-group">
+              <label>Folder / Tab Category</label>
+              <select id="techFolderSelect"></select>
+            </div>
+            <div class="form-group">
+              <label>Target Script File</label>
+              <input type="text" id="techFile" value="custom_technologies.txt" />
+            </div>
+            <div class="form-group">
+              <label>Technology ID <span class="sb-help" data-help="sidebar-general" title="About this panel">?</span></label>
+              <input type="text" id="techId" placeholder="infantry_weapons1" title="Set only when creating a new node; existing IDs are fixed." />
+            </div>
+
+            <div class="form-section" style="background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 10px; margin-bottom: 12px;">
+              <h3 style="margin: 0 0 8px 0; font-size: 13px;">Country preview (<span id="countryLabelTag">---</span>)</h3>
+              <p style="font-size: 11px; color: #8b949e; margin: 0 0 8px 0;">Editor-only flags; saved with your mod.</p>
+              <p id="countryTechStats" style="font-size: 11px; color: #58a6ff; margin: 0 0 8px 0;">Select a country to load starting techs.</p>
+              <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px; cursor: pointer;">
+                <input type="checkbox" id="countryTechResearched" style="width: 16px; height: 16px; margin: 0; accent-color: var(--accent-purple); cursor: pointer;" />
+                <span>Researched at game start</span>
+              </label>
+
+              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                <input type="checkbox" id="techHidden" style="width: 16px; height: 16px; margin: 0; accent-color: var(--accent-purple); cursor: pointer;" />
+                <span>Hidden tech (allow = always no)</span>
+              </label>
+              <label style="display: flex; align-items: center; gap: 8px; margin-top: 6px; cursor: pointer;">
+                <input type="checkbox" id="techDoctrine" style="width: 16px; height: 16px; margin: 0; accent-color: var(--accent-purple); cursor: pointer;" />
+                <span>Doctrine tech (<code>doctrine = yes</code>)</span>
+              </label>
+              <label id="techShowEquipmentIconRow" style="display: flex; align-items: center; gap: 8px; margin-top: 6px; cursor: pointer;">
+                <input type="checkbox" id="techShowEquipmentIcon" style="width: 16px; height: 16px; margin: 0; accent-color: var(--accent-purple); cursor: pointer;" />
+                <span>Use the equipment icon on the box <span class="sb-help" data-help="show-equipment-icon" title="What is this?">?</span></span>
+              </label>
+            </div>
+
+            <div class="form-group">
+              <label>Box size <span class="sb-help" data-help="box-size" title="Wide vs square box?">?</span></label>
+              <p id="techBoxSizeReadout" style="font-size: 12px; margin: 0 0 6px 0; color: #8b949e;">—</p>
+              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                <input type="checkbox" id="techForceSmall" style="width: 16px; height: 16px; margin: 0; accent-color: var(--accent-purple); cursor: pointer;" />
+                <span>Force small square box (<code>force_use_small_tech_layout</code>)</span>
+              </label>
+            </div>
+
+            <div class="form-group">
+              <label>Dependencies <span class="sb-help" data-help="prereq-vs-dep" title="Prerequisites vs Dependencies?">?</span></label>
+              <div id="depsList" style="display: flex; flex-direction: column; gap: 4px; margin-bottom: 6px;"></div>
+              <button class="btn btn-secondary" id="addDepBtn" type="button" style="font-size: 11px; padding: 4px 8px;">+ Add Dependency</button>
+            </div>
+            <div class="form-group">
+              <label>In-game Name</label>
+              <input type="text" id="techName" placeholder="Interwar Infantry Weapons" />
+            </div>
+            <div class="form-group">
+              <label>In-game Description</label>
+              <textarea id="techDesc" placeholder="Brief description of this technology..."></textarea>
+            </div>
+            
+            <div class="form-row">
+              <div class="form-group">
+                <label>Research Cost <span class="sb-help" data-help="research-cost" title="What does this number mean?">?</span></label>
+                <input type="number" id="techCost" step="0.5" value="1.5" />
+              </div>
+              <div class="form-group">
+                <label>Start Year</label>
+                <input type="number" id="techYear" value="1936" />
+              </div>
+            </div>
+
+            <div class="form-group" style="margin-top: 8px; padding: 8px; background: rgba(232, 168, 73, 0.1); border: 1px solid rgba(232, 168, 73, 0.2); border-radius: 4px;">
+              <span style="font-size: 11px; color: #8b949e;">Ahead-of-Time Penalty:</span>
+              <span style="font-size: 12px; color: #e8a849; font-weight: bold; float: right;" id="aheadOfTimePenaltyVal">0% (No penalty)</span>
+            </div>
+
+            <div class="form-row" style="margin-top: 10px; align-items: flex-end;">
+              <div class="form-group">
+                <label>Grid X (Lane)</label>
+                <input type="number" id="techX" step="1" value="0" />
+              </div>
+              <div class="form-group">
+                <label>Grid Y (Year Column)</label>
+                <input type="number" id="techY" step="1" value="0" />
+              </div>
+            </div>
+
+            <div class="form-group" style="margin-top: 14px;">
+              <label>Prerequisites <span class="sb-help" data-help="prerequisites" title="What are prerequisites?">?</span></label>
+              <div id="prereqsList" style="display: flex; flex-direction: column; gap: 4px; margin-bottom: 6px;"></div>
+              <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                <button class="btn btn-secondary" id="addPrereqBtn" style="font-size: 11px; padding: 4px 8px;">⌨ Add by ID</button>
+                <button class="btn btn-secondary" id="linkTechsBtn" type="button" title="Click a parent tech on the canvas, then a child — the child now requires the parent. Same result as 'Add by ID', just by clicking." style="font-size: 11px; padding: 4px 8px;">🔗 Add by clicking</button>
+              </div>
+            </div>
+
+            <div class="form-group" style="margin-top: 14px;">
+              <label>Unlocks <span class="sb-help" data-help="unlocks" title="What are unlocks?">?</span></label>
+              <div id="unlocksList" style="display: flex; flex-direction: column; gap: 4px;"></div>
+            </div>
+
+            <div class="form-group" style="margin-top: 14px;">
+              <label>Mutually Exclusive Techs <span class="sb-help" data-help="mutex" title="What is mutually exclusive?">?</span></label>
+              <div id="exclusiveList" style="display: flex; flex-direction: column; gap: 4px; margin-bottom: 6px;"></div>
+              <button class="btn btn-secondary" id="addExclusiveBtn" style="font-size: 11px; padding: 4px 8px;">+ Add Mutually Exclusive Tech</button>
+            </div>
+
+            <!-- BUGFIX/FEATURE: Sub-technologies were renderable but had no creation UI -->
+            <div class="form-group" style="margin-top: 14px;">
+              <label>Sub-technologies <span class="sb-help" data-help="subtech" title="What are sub-technologies?">?</span></label>
+              <div id="subTechList" style="display: flex; flex-direction: column; gap: 4px; margin-bottom: 6px;"></div>
+              <button class="btn btn-secondary" id="addSubTechBtn" style="font-size: 11px; padding: 4px 8px;">+ Add Sub-technology</button>
+            </div>
+
+            <div class="form-group">
+              <label>Technology Icon</label>
+              <div class="picture-upload-group">
+                <div class="picture-preview" id="techIconPreview">Icon</div>
+                <div style="display: flex; flex-direction: column; gap: 4px; flex: 1;">
+                  <input type="text" id="techIconId" placeholder="GFX_infantry_weapons_medium" style="padding: 4px 8px; font-size: 12px;" />
+                  <input type="file" id="techIconUpload" accept="image/png, image/jpeg" style="display: none;" />
+                  <div style="display: flex; gap: 4px;">
+                    <button class="btn btn-secondary" id="techUploadBtn" style="flex: 1; padding: 4px; font-size: 11px;">Upload PNG</button>
+                    <button class="btn btn-secondary" id="techBrowseBtn" style="flex: 1; padding: 4px; font-size: 11px; background: #1f2937;">Browse Icons</button>
+                  </div>
+                </div>
+              </div>
+              <div id="techIconStatus" style="font-size: 10px; margin-top: 5px; line-height: 1.4;"></div>
+            </div>
+
+            <div class="form-group">
+              <label>Categories <span class="sb-help" data-help="categories" title="What are categories?">?</span></label>
+              <textarea id="techCategories" placeholder="rocketry&#10;artillery_tech" style="min-height: 40px;"></textarea>
+            </div>
+
+
+            <div class="form-group">
+              <label>Modifiers (Passive Country Buffs)</label>
+              <textarea id="techModifiers" placeholder="infantry_defend = 0.10&#10;political_power_gain = 0.05" style="min-height: 50px;"></textarea>
+              <div class="genesis-preview" id="techModifiersPreview" style="display:none;"></div>
+            </div>
+
+            <div class="form-group">
+              <label>🔒 Limit to one country <span class="sb-help" data-help="country-lock" title="What does limiting to one country do?">?</span></label>
+              <select id="techCountryLock" style="width:100%; padding:6px; background:#0d1117; border:1px solid #30363d; color:#c9d1d9; border-radius:4px; font-size:13px;"></select>
+            </div>
+
+            <details class="nova-advanced">
+              <summary>Advanced — research weighting &amp; custom script</summary>
+              <div class="nova-advanced-body">
+                <p class="nova-advanced-hint">Fine controls most mods don't need. Each box has a ✨AI button — describe what you want instead of writing raw script.</p>
+                <div class="form-group">
+                  <label>AI Will Do (research weighting — leave blank for default) <span class="sb-help" data-help="ai-will-do" title="How does AI weighting work?">?</span></label>
+                  <textarea id="techAiWillDo" placeholder="factor = 1&#10;modifier = {&#10;  factor = 2&#10;  has_war = yes&#10;}" style="min-height: 40px;"></textarea>
+                </div>
+                <div class="form-group">
+                  <label>Extra Scripts (Subunit stats, custom blocks)</label>
+                  <textarea id="techExtraScript" placeholder="enable_subunits = {&#10;  infantry&#10;}" style="min-height: 60px;"></textarea>
+                </div>
+              </div>
+            </details>
+
+            <div class="form-group" style="display: flex; align-items: center; gap: 8px; margin-top: 14px;">
+              <input type="checkbox" id="enableEquipment" style="width: 16px; height: 16px; margin: 0; cursor: pointer;" />
+              <label for="enableEquipment" style="margin: 0; cursor: pointer; font-weight: bold;">Unlocks Production Equipment</label>
+            </div>
+
+            <!-- Bridge: make a country start with this tech already researched -->
+            <div class="form-group" style="margin-top: 16px; padding-top: 14px; border-top: 1px solid #2d3440;">
+              <label style="font-weight: bold;">Start a country with this tech researched <span class="sb-help" data-help="start-researched" title="What does this do?">?</span></label>
+              <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                <select id="techCountrySelect" style="flex: 1 1 220px; min-width: 200px; background: #0d1117; border: 1px solid #30363d; color: #c9d1d9; border-radius: 6px; padding: 8px 10px; font-size: 13px; outline: none;"></select>
+                <button class="btn" id="techGrantBtn" type="button">Add to country</button>
+                <button class="btn btn-secondary" id="techRevokeBtn" type="button" style="display: none;">Remove</button>
+              </div>
+              <div id="techGrantStatus" style="font-size: 12px; margin-top: 8px; min-height: 16px;"></div>
+            </div>
+          </div>
+
+          <!-- 3. Weapon Equipment Details (Conditional) -->
+          <div class="form-section" id="equipmentSection" style="display: none; background: #181d27; border-top: 1px solid #2d3440;">
+            <h3 style="color: #e8a849; display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+              <span>Weapon / Equipment Editor</span>
+              <!-- Military is where equipment really lives (full stats, variants, designers). This is the
+                   return leg of the Equipment→Research link the arsenal already had. #eq-deeplink -->
+              <a id="equipOpenInMilitary" href="army.html" title="Open this equipment in the Military tab"
+                 style="font-size:12px; font-weight:600; color:#58a6ff; text-decoration:none; border:1px solid #30363d; border-radius:6px; padding:3px 9px; background:#0d1117;">🪖 Open in Military →</a>
+            </h3>
+            <div class="form-group">
+              <label>Equipment File</label>
+              <input type="text" id="equipFile" value="custom_equipment.txt" />
+            </div>
+            <div class="form-group">
+              <label>Equipment ID</label>
+              <input type="text" id="equipId" placeholder="infantry_equipment_1" />
+            </div>
+            <div class="form-group">
+              <label>Equipment Archetype</label>
+              <input type="text" id="equipArchetype" placeholder="pick an archetype from the loaded mod" list="equipArchetypeList" autocomplete="off" />
+              <datalist id="equipArchetypeList"></datalist>
+            </div>
+            <div class="form-group">
+              <label>Production Cost (IC) <span class="sb-help" data-help="production-cost" title="What is IC?">?</span></label>
+              <input type="number" id="equipCost" step="0.05" value="0.5" />
+            </div>
+            
+            <div class="form-row">
+              <div class="form-group">
+                <label>Soft Attack</label>
+                <input type="number" id="equipSoftAttack" step="0.5" value="6" />
+              </div>
+              <div class="form-group">
+                <label>Hard Attack</label>
+                <input type="number" id="equipHardAttack" step="0.5" value="1" />
+              </div>
+            </div>
+
+            <div class="form-row" style="margin-top: 10px;">
+              <div class="form-group">
+                <label>Defense</label>
+                <input type="number" id="equipDefense" step="1" value="22" />
+              </div>
+              <div class="form-group">
+                <label>Breakthrough</label>
+                <input type="number" id="equipBreakthrough" step="1" value="3" />
+              </div>
+            </div>
+
+            <div class="form-row" style="margin-top: 10px;">
+              <div class="form-group">
+                <label>AP Attack</label>
+                <input type="number" id="equipApAttack" step="0.5" value="4" />
+              </div>
+              <div class="form-group">
+                <label>Reliability</label>
+                <input type="number" id="equipReliability" step="0.05" value="0.9" />
+              </div>
+            </div>
+
+            <div class="form-group" style="margin-top: 12px;">
+              <label>Resource Costs (e.g. steel = 2)</label>
+              <textarea id="equipResources" placeholder="steel = 2&#10;rubber = 1" style="min-height: 40px;"></textarea>
+            </div>
+          </div>
+
+          <!-- Preview how this tech's detail popup looks in-game -->
+          <div class="form-section" style="padding-top: 0;">
+            <button class="btn" id="previewIngameBtn" type="button" style="width: 100%;" title="See how this technology's detail popup looks in-game (the panel that opens when a player clicks it).">👁 Preview in-game popup</button>
+          </div>
+
+          <!-- 4. Node Action Footer -->
+          <div class="form-section" style="display: flex; gap: 8px;">
+            <button class="btn btn-secondary" id="duplicateTechBtn" type="button" title="Make a copy of this tech as a new node — a ready-to-edit starting point for a variant (keeps its folder, equipment, modifiers, scripts and icon)." style="flex: 1; color: #58a6ff;">⧉ Duplicate</button>
+            <button class="btn btn-danger" id="deleteTechBtn" style="flex: 1;">Delete Node</button>
+            <button class="btn btn-secondary" id="deselectBtn" style="flex: 1;">Deselect</button>
+          </div>
+        </div>
+
+        <div id="noSelectionPanel" style="padding: 24px; color: #8b949e; text-align: center; font-size: 13px;">
+          <p>No technology node selected.</p>
+          <p style="margin-top: 8px; font-size: 12px; opacity: 0.8;">Click any node on the canvas to edit its properties, or use the "+ Add Tech Node" button above to create a new technology.</p>
+        </div>
+      </aside>
+
+      <!-- MAIN CANVAS CONTAINER -->
+      <main class="research-main">
+        <!-- Banner notification for Link Mode -->
+        <div id="linkBanner" class="banner-notification" style="display: none;">
+          <span>🔗 <strong>Link Mode Active:</strong> Click the parent node first, then click the child node to create a prerequisite connection.</span>
+          <button id="cancelLinkBtn">Exit Link Mode</button>
+        </div>
+
+        <div class="folder-tabs-shell">
+          <button class="folder-tabs-scroll" id="folderTabsScrollLeft" type="button" title="Scroll tabs left">&lt;</button>
+          <div class="folder-tabs" id="folderTabs">
+            <!-- Populated by JS -->
+          </div>
+          <button class="folder-tabs-scroll" id="folderTabsScrollRight" type="button" title="Scroll tabs right">&gt;</button>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:8px; padding:4px 8px;">
+          <button class="btn" id="newTechBtn" type="button" style="font-size:12px; padding:5px 12px;">+ Add Tech Node</button>
+          <!-- Undo/redo: editor-side only, nothing reaches the mod until Save Changes. #research-undo -->
+          <span style="display:inline-flex; align-items:center; gap:2px;">
+            <button class="btn btn-secondary" id="researchUndoBtn" type="button" disabled
+                    style="font-size:13px; padding:5px 9px;" title="Nothing to undo (Ctrl+Z)">↶</button>
+            <button class="btn btn-secondary" id="researchRedoBtn" type="button" disabled
+                    style="font-size:13px; padding:5px 9px;" title="Nothing to redo (Ctrl+Y)">↷</button>
+          </span>
+          <span style="display:inline-flex; align-items:center;">
+            <button class="btn btn-secondary" id="orientationToggleBtn" type="button" style="font-size:12px; padding:5px 10px;">Orientation: Horizontal ⇄</button>
+            <span class="sb-help" data-help="orientation" title="What does orientation do?">?</span>
+          </span>
+          <div id="dlcFilterWrap" style="position:relative; display:none;">
+            <button class="btn btn-secondary" id="dlcFilterBtn" type="button" title="Choose which DLCs you own. The tree shows exactly the folder layout the game uses for that DLC set (e.g. No Step Back makes the armour tree vertical)." style="font-size:12px; padding:5px 10px;">🎮 DLCs</button>
+            <div id="dlcFilterPanel" style="display:none; position:absolute; top:calc(100% + 4px); left:0; min-width:230px; background:#0d1117; border:1px solid #30363d; border-radius:8px; box-shadow:0 12px 32px rgba(0,0,0,0.5); z-index:100000; padding:10px 12px;">
+              <div style="font-size:11px; color:#9aa4b2; margin-bottom:8px; line-height:1.4;">Tick the DLCs you own. The research tree redraws to match your game exactly.</div>
+              <div id="dlcFilterList" style="display:flex; flex-direction:column; gap:6px;"></div>
+            </div>
+          </div>
+          <button class="btn btn-secondary" id="openCustomTabBtn" type="button" title="Edit the current tab — change its icon, name, or ledger. (To add a new tab, use the + Custom Tab button in the tab strip.)" style="font-size:12px; padding:5px 10px;">✎ Edit Tab</button>
+          <div style="position:relative;">
+            <input type="text" id="techSearchInput" placeholder="🔍 Find a tech…" autocomplete="off" spellcheck="false"
+              style="font-size:12px; padding:5px 9px; width:190px; background:#0d1117; border:1px solid #30363d; color:#e6edf3; border-radius:6px; outline:none;" />
+            <div id="techSearchResults" style="display:none; position:absolute; top:calc(100% + 4px); left:0; width:320px; max-height:320px; overflow:auto; background:#0d1117; border:1px solid #30363d; border-radius:8px; box-shadow:0 12px 32px rgba(0,0,0,0.5); z-index:100000;"></div>
+          </div>
+          <div style="margin-left:auto; display:flex; align-items:center; gap:4px;">
+            <button class="btn btn-secondary" id="researchMinimapBtn" type="button" title="Toggle the minimap — a bird's-eye view of the whole tree; click/drag it to jump around." style="font-size:12px; padding:4px 9px;">🗺 Minimap</button>
+            <button class="btn btn-secondary" id="researchZoomOut" type="button" title="Zoom out (Z)" style="font-size:14px; padding:3px 10px;">−</button>
+            <span id="researchZoomLabel" title="Click to reset zoom" style="font-size:11px; color:#9aa4b2; min-width:38px; text-align:center; cursor:pointer; user-select:none;">100%</span>
+            <button class="btn btn-secondary" id="researchZoomIn" type="button" title="Zoom in (X)" style="font-size:14px; padding:3px 10px;">+</button>
+          </div>
+        </div>
+
+        <div class="canvas-container" id="canvasContainer">
+          <!-- Minimap: a bird's-eye view of the whole tree; click/drag to jump. Fixed so it never scrolls away. -->
+          <div id="researchMinimap" style="display:none; position:fixed; bottom:16px; right:16px; z-index:500; background:rgba(13,17,23,0.92); border:1px solid #30363d; border-radius:8px; box-shadow:0 8px 24px rgba(0,0,0,0.55); padding:6px;">
+            <canvas id="researchMinimapCanvas" width="220" height="150" style="display:block; cursor:pointer; border-radius:4px;"></canvas>
+          </div>
+          <div class="research-canvas" id="researchCanvas">
+            <!-- Per-folder themed background art (server room for electronics, etc.) — matches the game -->
+            <div class="research-bg" id="researchBg"></div>
+            <!-- Year Markers -->
+            <div class="year-markers" id="yearMarkers"></div>
+            
+            <!-- SVG connector lines -->
+            <svg class="lines-svg" id="linesSvg">
+              <!-- Rendered dynamically -->
+            </svg>
+
+            <!-- Tech Nodes placed here -->
+            <div id="nodesLayer"></div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- Icon Picker Modal -->
+    <div id="iconPickerModal" class="modal">
+      <div class="modal-content" style="background-color: #0d1117; width: 80%; max-width: 900px; box-shadow: 0 8px 32px rgba(0,0,0,0.5);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #21262d; padding-bottom: 12px;">
+          <h2 style="margin: 0; font-size: 18px; color: #c9d1d9;">Select Technology Icon</h2>
+          <span id="closeIconPicker" style="color: #8b949e; float: right; font-size: 28px; font-weight: bold; cursor: pointer; transition: color 0.2s;">&times;</span>
+        </div>
+        <input type="text" id="iconPickerSearch" placeholder="🔍 Search icons by name (e.g. infantry, heavy, fighter, submarine, industry)..." style="width: 100%; padding: 12px; font-size: 14px; background: #161b22; border: 1px solid #30363d; color: #c9d1d9; border-radius: 6px; margin-bottom: 20px; outline: none;" />
+        <div id="iconPickerGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 16px; max-height: 500px; overflow-y: auto; padding: 4px;">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Custom Tab Prompt Modal -->
+    <div id="customTabModal" class="modal">
+      <div class="modal-content" style="background-color: #0d1117; width: 90%; max-width: 450px; box-shadow: 0 8px 32px rgba(0,0,0,0.5); pointer-events: auto !important;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #21262d; padding-bottom: 12px;">
+          <h2 id="customTabModalTitle" style="margin: 0; font-size: 18px; color: #c9d1d9;">Create Custom Research Tab</h2>
+          <span id="closeCustomTabModal" style="color: #8b949e; float: right; font-size: 28px; font-weight: bold; cursor: pointer; transition: color 0.2s;">&times;</span>
+        </div>
+        <div style="margin-bottom: 16px;">
+          <label style="display: block; font-size: 12px; margin-bottom: 6px; color: #8b949e; font-weight: 600;">Tab Name:</label>
+          <input type="text" id="customTabNameInput" placeholder="e.g. Future Weapons, Space Tech" style="width: 100%; padding: 10px; font-size: 14px; background: #161b22; border: 1px solid #30363d; color: #c9d1d9; border-radius: 6px; outline: none; box-sizing: border-box; pointer-events: auto !important; position: relative; z-index: 100000002;" />
+        </div>
+        <div style="margin-bottom: 16px;">
+          <label style="display: block; font-size: 12px; margin-bottom: 6px; color: #8b949e; font-weight: 600;">Research Ledger:</label>
+          <select id="customTabLedgerSelect" style="width: 100%; padding: 10px; font-size: 14px; background: #161b22; border: 1px solid #30363d; color: #c9d1d9; border-radius: 6px; outline: none; box-sizing: border-box; pointer-events: auto !important; position: relative; z-index: 100000002;">
+            <option value="army">Army (land research bonuses)</option>
+            <option value="navy">Navy (naval research bonuses)</option>
+            <option value="air">Air (air research bonuses)</option>
+            <option value="civilian">Civilian (industry / other)</option>
+          </select>
+          <div style="font-size: 11px; color: #6e7681; margin-top: 4px;">Which research-bonus group this tab's techs belong to in-game.</div>
+        </div>
+        <div style="margin-bottom: 16px;">
+          <label style="display: block; font-size: 12px; margin-bottom: 6px; color: #8b949e; font-weight: 600;">Tab Icon <span style="color:#6e7681; font-weight: 400;">(optional)</span>:</label>
+          <input type="file" id="customTabIconInput" accept="image/png, image/jpeg" style="width: 100%; padding: 8px; font-size: 12px; background: #161b22; border: 1px solid #30363d; color: #c9d1d9; border-radius: 6px; box-sizing: border-box;" />
+          <div style="font-size: 11px; color: #6e7681; margin-top: 4px;">Leave empty to use a placeholder icon you can replace later. PNG/JPG auto-converts to DDS.</div>
+        </div>
+        <div style="margin-bottom: 16px;">
+          <label style="display: block; font-size: 12px; margin-bottom: 6px; color: #8b949e; font-weight: 600;">Layout Style:</label>
+          <select id="customTabLayoutSelect" style="width: 100%; padding: 10px; font-size: 14px; background: #161b22; border: 1px solid #30363d; color: #c9d1d9; border-radius: 6px; outline: none; box-sizing: border-box; pointer-events: auto !important; position: relative; z-index: 100000002;">
+            <option value="horizontal">Horizontal (Default)</option>
+            <option value="vertical">Vertical (HOI4 Up style)</option>
+          </select>
+        </div>
+        <div style="margin-bottom: 20px; padding: 10px 12px; background: #161b22; border: 1px solid #21262d; border-left: 3px solid #2ea043; border-radius: 4px; font-size: 11px; color: #8b949e; line-height: 1.5;">
+          Creating a tab writes real files into your mod: the folder definition, a clickable tab in the research screen (a mod copy of <code style="color:#c9d1d9;">countrytechtreeview.gui</code>), and the tab sprite. Load the mod and open the research tree to see it in-game.
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 8px;">
+          <button id="cancelCustomTabBtn" style="background: #21262d; border: 1px solid #30363d; color: #c9d1d9; padding: 8px 16px; font-size: 13px; font-weight: 600; border-radius: 6px; cursor: pointer; border: 1px solid #30363d;">Cancel</button>
+          <button id="confirmCustomTabBtn" style="background: #10b981; border: 1px solid #059669; color: #fff; padding: 8px 16px; font-size: 13px; font-weight: 600; border-radius: 6px; cursor: pointer; border: 1px solid #059669;">Create Tab</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="./genesis-engine.js?v=23"></script>
+    <script src="./genesis-scripted-loader.js?v=1"></script>
+    <script src="./nova-ai-parse.js"></script>
+    <script src="./country-picker.js"></script>
+    <script src="./tech-icon.js?v=4"></script>
+    <script src="research.js?v=gamefolder90"></script>
+    <script src="./ai-field-assist.js"></script>
+  <script src="./version-banner.js"></script>
+  </body>
+</html>

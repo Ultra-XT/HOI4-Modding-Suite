@@ -1,0 +1,40 @@
+COMPONENTS UNDER THE GNU LESSER GENERAL PUBLIC LICENSE (LGPL)
+
+Nova uses the following libraries. Each is licensed under the GNU LGPL
+version 2, 2.1 or 3. Where its terms add "or (at your option) any later
+version", Nova uses it under the GNU LGPL version 3, as those terms
+allow. Copies of the GNU LGPL versions 3 and 2.1 and of the GNU GPL
+version 3 are in the licenses folder next to this file.
+
+  - libvips {vips} with glib {glib}, pango {pango}, fribidi {fribidi},
+    libexif {exif}, libheif {heif}, librsvg {rsvg} and proxy-libintl
+    {proxy-libintl}: in resources\app.asar.unpacked\node_modules\@img\
+    sharp-win32-x64\lib\libvips-42.dll and libvips-cpp.dll
+  - FFmpeg (Chromium {chrome}): ffmpeg.dll
+  - WebKit code inside Chromium {chrome}: in the program's .exe
+[portable]   - 7-Zip (nsis7z plug-in) and StdUtils: in the portable launcher only
+{copyrightLines}
+
+You may replace libvips-42.dll, libvips-cpp.dll or ffmpeg.dll with a
+modified version that is compatible with it, and use Nova with it.
+Section 6.2 of Nova's licence gives you the rights to do so.
+
+cairo {cairo}, inside libvips-42.dll, is under the Mozilla Public
+License 2.0 (licenses\MPL-2.0.txt).
+
+Source code of all of these, at the exact versions in this release:
+  libvips {vips} and every library inside libvips-42.dll, cairo
+  included: the build that made the DLLs. It pins the source archive of
+  each library, with its sha256, and the patches applied to it, directly
+  or through the MXE revision it names:
+    {libvipsSource}
+  libvips-cpp.dll, which sharp {sharp} builds from the C++ sources of
+  that libvips release (its src/binding.gyp):
+    {libvipsCppSource}
+  FFmpeg and WebKit/Chromium: Electron v{electron}
+  (https://github.com/electron/electron/tree/v{electron}) and Chromium
+  {chrome} (https://chromium.googlesource.com/chromium/src/+/{chrome}),
+  FFmpeg at {ffmpegRevision}.
+[portable] {launcherSources}
+FFmpeg is a trademark of Fabrice Bellard, originator of the FFmpeg
+project.

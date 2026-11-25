@@ -1,0 +1,7 @@
+Data derived from cwtools-hoi4-config ({dataFiles} inside the
+app), https://github.com/cwtools/cwtools-hoi4-config
+Licence: MIT. Copyright (c) 2018 tboby.
+{licence:cwtools-hoi4-config-LICENSE.txt}
+Some descriptions in that data quote Paradox Interactive's own game
+documentation. Those quotes belong to Paradox Interactive AB and are not
+licensed by this notice or by Nova's licence.

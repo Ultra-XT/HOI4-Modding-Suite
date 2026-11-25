@@ -1,0 +1,17 @@
+7-Zip NSIS plug-in (nsis7z.dll), based on 7-Zip by Igor Pavlov
+{nsis7z.legalCopyright}. Licence: GNU LGPL 2.1 or
+(at your option) any later version, with the other notices in 7-Zip's
+License.txt. https://nsis.sourceforge.io/Nsis7z_plug-in
+{licence:7-Zip-license.txt}
+
+NSIS StdUtils plug-in (StdUtils.dll) {stdutils.fileVersion}
+{stdutils.legalCopyright}. Licence: GNU LGPL 2.1 or (at your option) any later
+version, with the author's clarification that installers using it
+through the NSIS plug-in interface are not derivative works.
+https://github.com/lordmulder/stdutils
+{licence:StdUtils-LGPL_CLARIFICATION.txt}
+
+NSIS (Nullsoft Scriptable Install System), which the portable launcher
+is made with, and its {system.component}, which runs inside it.
+https://nsis.sourceforge.io
+{licence:NSIS-COPYING.txt}

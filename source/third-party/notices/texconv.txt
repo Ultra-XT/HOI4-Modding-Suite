@@ -1,0 +1,4 @@
+DirectXTex texconv {texconv.fileVersion}  ({texconv.where})
+Microsoft DirectXTex, https://github.com/microsoft/DirectXTex
+Licence: MIT. Copyright (c) Microsoft Corporation.
+{licence:DirectXTex-LICENSE.txt}
